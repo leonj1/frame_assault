@@ -11,6 +11,74 @@ import (
 	tl "github.com/Ariemeth/termloop"
 )
 
+// BuildingType represents different types of buildings
+type BuildingType struct {
+	name  string
+	color tl.Attr
+	char  rune
+}
+
+var buildingTypes = []BuildingType{
+	{"Hospital", tl.ColorRed, 'H'},
+	{"School", tl.ColorYellow, 'S'},
+	{"Bank", tl.ColorGreen, 'B'},
+	{"Grocery", tl.ColorCyan, 'G'},
+	{"Police", tl.ColorBlue, 'P'},
+	{"Library", tl.ColorMagenta, 'L'},
+	{"Mall", tl.ColorWhite, 'M'},
+	{"Restaurant", tl.ColorRed, 'R'},
+	{"Theater", tl.ColorYellow, 'T'},
+	{"Gym", tl.ColorGreen, 'Y'},
+}
+
+// Building represents a city building with a specific purpose
+type Building struct {
+	*tl.Entity
+	buildingType BuildingType
+	width        int
+	height       int
+}
+
+func NewBuilding(x, y, width, height int, buildingType BuildingType) *Building {
+	building := &Building{
+		Entity:       tl.NewEntity(x, y, width, height),
+		buildingType: buildingType,
+		width:        width,
+		height:       height,
+	}
+	return building
+}
+
+func (b *Building) Draw(s *tl.Screen) {
+	x, y := b.Position()
+	for i := 0; i < b.width; i++ {
+		for j := 0; j < b.height; j++ {
+			// Draw building outline
+			if i == 0 || i == b.width-1 || j == 0 || j == b.height-1 {
+				s.RenderCell(x+i, y+j, &tl.Cell{
+					Bg: b.buildingType.color,
+					Fg: tl.ColorBlack,
+					Ch: '█',
+				})
+			} else if i == b.width/2 && j == b.height/2 {
+				// Draw building type identifier in center
+				s.RenderCell(x+i, y+j, &tl.Cell{
+					Bg: b.buildingType.color,
+					Fg: tl.ColorBlack,
+					Ch: b.buildingType.char,
+				})
+			} else {
+				// Fill building interior
+				s.RenderCell(x+i, y+j, &tl.Cell{
+					Bg: b.buildingType.color,
+					Fg: b.buildingType.color,
+					Ch: ' ',
+				})
+			}
+		}
+	}
+}
+
 // GenerateEnemyMechs creates a slice of mechs to be used as enemies
 func GenerateEnemyMechs(number int) []*mech.Mech {
 	enemyMechs := make([]*mech.Mech, 0, number)
@@ -110,7 +178,6 @@ const (
 )
 
 func createManhattanLayout(level *tl.BaseLevel) {
-	blockColor := tl.ColorMagenta // Buildings/blocks in magenta
 	roadSystem := NewRoadSystem()
 
 	// Main avenues (vertical roads)
@@ -132,16 +199,21 @@ func createManhattanLayout(level *tl.BaseLevel) {
 	level.AddEntity(roadSystem)
 
 	// City blocks (buildings)
+	buildingIndex := 0
 	for x := 0; x < levelWidth-buildingWidth; x += avenueSpacing {
 		for y := 0; y < levelHeight-buildingHeight; y += streetSpacing {
 			if x+buildingWidth <= levelWidth && y+buildingHeight <= levelHeight {
-				level.AddEntity(tl.NewRectangle(
+				// Cycle through building types
+				buildingType := buildingTypes[buildingIndex%len(buildingTypes)]
+				building := NewBuilding(
 					x+buildingOffset,
 					y+1,
 					buildingWidth,
 					buildingHeight,
-					blockColor,
-				))
+					buildingType,
+				)
+				level.AddEntity(building)
+				buildingIndex++
 			}
 		}
 	}
