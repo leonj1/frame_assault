@@ -28,7 +28,7 @@ var buildingTypes = []BuildingType{
 	{"Mall", tl.ColorWhite, 'M'},
 	{"Restaurant", tl.ColorRed, 'R'},
 	{"Theater", tl.ColorYellow, 'T'},
-	{"Gym", tl.ColorGreen, 'G'},
+	{"Gym", tl.ColorGreen, 'Y'},
 }
 
 // Building represents a city building with a specific purpose
