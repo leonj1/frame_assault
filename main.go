@@ -87,6 +87,7 @@ func main() {
 	for _, enemy := range enemies {
 		enemy.AttachGame(game)
 		enemy.AttachNotifier(notification)
+		enemy.SetLevel(level)
 		level.AddEntity(enemy)
 	}
 
@@ -97,6 +98,7 @@ func main() {
 	player.SetEnemyList(enemies)
 	player.AttachGame(game)
 	player.AttachNotifier(notification)
+	player.SetLevel(level)
 	level.AddEntity(player)
 
 	//Create the players mech status display

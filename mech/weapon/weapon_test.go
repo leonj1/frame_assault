@@ -10,6 +10,18 @@ func (fakeTarget *testTarget) Hit(damage int) {
 	fakeTarget.DamageTaken += damage
 }
 
+func (fakeTarget *testTarget) Name() string {
+	return "Test Target"
+}
+
+func (fakeTarget *testTarget) IsDestroyed() bool {
+	return fakeTarget.DamageTaken >= 4
+}
+
+func (fakeTarget *testTarget) Position() (int, int) {
+	return 5, 5 // Fixed test position
+}
+
 func TestWeapon(t *testing.T) {
 	weapon1 := Create(2, 2, "test weapon1", 0.6)
 

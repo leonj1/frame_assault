@@ -19,6 +19,7 @@ type Mech struct {
 	prevX        int
 	prevY        int
 	game         *tl.Game
+	level        *tl.BaseLevel
 	notifier     util.Notifier
 }
 
@@ -35,22 +36,31 @@ func NewMech(name string, maxStructure, x, y int, color tl.Attr, symbol rune) *M
 	return &newMech
 }
 
-//AttachGame is used to attach the termloop game struct for logging
+// AttachGame is used to attach the termloop game struct for logging
 func (m *Mech) AttachGame(game *tl.Game) {
 	m.game = game
 }
 
-//AttachNotifier is used to attach a notification display
+// SetLevel sets the game level for the mech
+func (m *Mech) SetLevel(level *tl.BaseLevel) {
+	m.level = level
+	// Update all weapons with the new level
+	for i := range m.weapons {
+		m.weapons[i].SetLevel(level)
+	}
+}
+
+// AttachNotifier is used to attach a notification display
 func (m *Mech) AttachNotifier(notifier util.Notifier) {
 	m.notifier = notifier
 }
 
-//Name returns the name of the mech
+// Name returns the name of the mech
 func (m Mech) Name() string {
 	return m.name
 }
 
-//Weapons returns the mechs weapons
+// Weapons returns the mechs weapons
 func (m Mech) Weapons() []weapon.Weapon {
 	return m.weapons
 }
@@ -75,7 +85,7 @@ func (m *Mech) Collide(collision tl.Physical) {
 	// Check if it's a Rectangle we're colliding with
 	if _, ok := collision.(*tl.Rectangle); ok {
 		m.entity.SetPosition(m.prevX, m.prevY)
-	// or if it is another mech
+		// or if it is another mech
 	} else if _, ok := collision.(*Mech); ok {
 		m.entity.SetPosition(m.prevX, m.prevY)
 	}
@@ -91,12 +101,18 @@ func (m *Mech) Draw(screen *tl.Screen) {
 // Tick is called to process 1 tick of actions based on the
 // type of event.
 func (m *Mech) Tick(event tl.Event) {
+	m.prevX, m.prevY = m.entity.Position()
 
+	// Update level reference if needed
+	if m.level == nil && m.game != nil && m.game.Screen() != nil {
+		if level, ok := m.game.Screen().Level().(*tl.BaseLevel); ok {
+			m.SetLevel(level)
+		}
+	}
 }
 
 // Hit is call when a mech is hit
 func (m *Mech) Hit(damage int) {
-
 	//check if the mech is already destroyed
 	if m.structure <= 0 {
 		return
@@ -121,14 +137,21 @@ func (m Mech) IsDestroyed() bool {
 }
 
 // AddWeapon adds a Weapon to the mech
-func (m *Mech) AddWeapon(weapon weapon.Weapon) {
-	m.weapons = append(m.weapons, weapon)
+func (m *Mech) AddWeapon(w weapon.Weapon) {
+	// Set the weapon's level for bullet creation if we have one
+	if m.level != nil {
+		w.SetLevel(m.level)
+	}
+	m.weapons = append(m.weapons, w)
 }
 
 // Fire tells the Mech to fire at a Target
 func (m *Mech) Fire(rangeToTarget int, target weapon.Target) {
-	for _, weapon := range m.weapons {
-		result := weapon.Fire(rangeToTarget, target)
+	x, y := m.entity.Position()
+	for _, w := range m.weapons {
+		// Update weapon position before firing
+		w.SetPosition(x, y)
+		result := w.Fire(rangeToTarget, target)
 		if result == false {
 			m.notifier.AddMessage("Missed " + target.Name())
 		}
@@ -136,7 +159,6 @@ func (m *Mech) Fire(rangeToTarget int, target weapon.Target) {
 }
 
 func (m *Mech) attack(target weapon.Target) {
-
 	if target == nil {
 		return
 	}
