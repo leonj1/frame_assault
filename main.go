@@ -67,17 +67,44 @@ func GenerateEnemyMechs(number int) []*mech.Mech {
 	return enemyMechs
 }
 
+func createManhattanLayout(level *tl.BaseLevel) {
+	// Colors for Manhattan layout
+	roadColor := tl.ColorBlue     // Roads in blue for better visibility
+	blockColor := tl.ColorMagenta // Buildings/blocks in magenta
+
+	// Main avenues (vertical roads) - Manhattan's major avenues
+	for x := 3; x < 60; x += 12 {
+		level.AddEntity(tl.NewRectangle(x, 0, 2, 40, roadColor))
+	}
+
+	// Cross streets (horizontal roads) - Manhattan's grid pattern
+	for y := 3; y < 40; y += 8 {
+		level.AddEntity(tl.NewRectangle(0, y, 60, 1, roadColor))
+	}
+
+	// City blocks (buildings) - Manhattan's rectangular blocks
+	for x := 0; x < 55; x += 12 {
+		for y := 0; y < 35; y += 8 {
+			if x+8 <= 60 && y+5 <= 40 {
+				level.AddEntity(tl.NewRectangle(x+5, y+1, 5, 5, blockColor))
+			}
+		}
+	}
+}
+
 func main() {
 	//Create the game
 	game := tl.NewGame()
 
 	//Create the level for the game
 	level := tl.NewBaseLevel(tl.Cell{
-		Bg: tl.ColorGreen,
+		Bg: tl.ColorBlack, // Dark background for contrast
 		Fg: tl.ColorBlack,
 		Ch: ' ',
 	})
-	level.AddEntity(tl.NewRectangle(10, 10, 50, 20, tl.ColorBlue))
+
+	// Create Manhattan-like layout
+	createManhattanLayout(level)
 
 	//Create the notification display
 	notification := display.NewNotification(25, 0, 45, 6, level)
