@@ -67,17 +67,99 @@ func GenerateEnemyMechs(number int) []*mech.Mech {
 	return enemyMechs
 }
 
+// RoadSystem represents a collection of road tiles managed by a single entity
+type RoadSystem struct {
+	*tl.Entity
+	roads map[int]map[int]bool
+}
+
+func NewRoadSystem() *RoadSystem {
+	return &RoadSystem{
+		Entity: tl.NewEntity(0, 0, 1, 1),
+		roads:  make(map[int]map[int]bool),
+	}
+}
+
+func (r *RoadSystem) AddRoad(x, y int) {
+	if r.roads[x] == nil {
+		r.roads[x] = make(map[int]bool)
+	}
+	r.roads[x][y] = true
+}
+
+func (r *RoadSystem) Draw(s *tl.Screen) {
+	for x, yMap := range r.roads {
+		for y := range yMap {
+			s.RenderCell(x, y, &tl.Cell{
+				Bg: tl.ColorBlue,
+				Fg: tl.ColorBlue,
+				Ch: ' ',
+			})
+		}
+	}
+}
+
+const (
+	levelWidth     = 60
+	levelHeight    = 40
+	avenueSpacing  = 12
+	streetSpacing  = 8
+	buildingWidth  = 5
+	buildingHeight = 5
+	buildingOffset = 5
+)
+
+func createManhattanLayout(level *tl.BaseLevel) {
+	blockColor := tl.ColorMagenta // Buildings/blocks in magenta
+	roadSystem := NewRoadSystem()
+
+	// Main avenues (vertical roads)
+	for x := buildingOffset - 2; x < levelWidth; x += avenueSpacing {
+		for y := 0; y < levelHeight; y++ {
+			roadSystem.AddRoad(x, y)
+			roadSystem.AddRoad(x+1, y)
+		}
+	}
+
+	// Cross streets (horizontal roads)
+	for y := buildingOffset; y < levelHeight; y += streetSpacing {
+		for x := 0; x < levelWidth; x++ {
+			roadSystem.AddRoad(x, y)
+		}
+	}
+
+	// Add the road system as a single entity
+	level.AddEntity(roadSystem)
+
+	// City blocks (buildings)
+	for x := 0; x < levelWidth-buildingWidth; x += avenueSpacing {
+		for y := 0; y < levelHeight-buildingHeight; y += streetSpacing {
+			if x+buildingWidth <= levelWidth && y+buildingHeight <= levelHeight {
+				level.AddEntity(tl.NewRectangle(
+					x+buildingOffset,
+					y+1,
+					buildingWidth,
+					buildingHeight,
+					blockColor,
+				))
+			}
+		}
+	}
+}
+
 func main() {
 	//Create the game
 	game := tl.NewGame()
 
 	//Create the level for the game
 	level := tl.NewBaseLevel(tl.Cell{
-		Bg: tl.ColorGreen,
+		Bg: tl.ColorBlack, // Dark background for contrast
 		Fg: tl.ColorBlack,
 		Ch: ' ',
 	})
-	level.AddEntity(tl.NewRectangle(10, 10, 50, 20, tl.ColorBlue))
+
+	// Create Manhattan-like layout
+	createManhattanLayout(level)
 
 	//Create the notification display
 	notification := display.NewNotification(25, 0, 45, 6, level)
