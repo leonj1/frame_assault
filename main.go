@@ -70,49 +70,63 @@ func GenerateEnemyMechs(number int) []*mech.Mech {
 // Road represents a walkable road tile
 type Road struct {
 	*tl.Entity
-	x, y int
 }
 
 func NewRoad(x, y int) *Road {
 	road := &Road{
 		Entity: tl.NewEntity(x, y, 1, 1),
-		x:      x,
-		y:      y,
 	}
 	return road
 }
 
 func (r *Road) Draw(s *tl.Screen) {
-	s.RenderCell(r.x, r.y, &tl.Cell{
+	x, y := r.Position()
+	s.RenderCell(x, y, &tl.Cell{
 		Bg: tl.ColorBlue,
 		Fg: tl.ColorBlue,
 		Ch: ' ',
 	})
 }
 
+const (
+	levelWidth     = 60
+	levelHeight    = 40
+	avenueSpacing  = 12
+	streetSpacing  = 8
+	buildingWidth  = 5
+	buildingHeight = 5
+	buildingOffset = 5
+)
+
 func createManhattanLayout(level *tl.BaseLevel) {
 	blockColor := tl.ColorMagenta // Buildings/blocks in magenta
 
-	// Main avenues (vertical roads) - Manhattan's major avenues
-	for x := 3; x < 60; x += 12 {
-		for y := 0; y < 40; y++ {
+	// Main avenues (vertical roads)
+	for x := 3; x < levelWidth; x += avenueSpacing {
+		for y := 0; y < levelHeight; y++ {
 			level.AddEntity(NewRoad(x, y))
 			level.AddEntity(NewRoad(x+1, y))
 		}
 	}
 
-	// Cross streets (horizontal roads) - Manhattan's grid pattern
-	for y := 3; y < 40; y += 8 {
-		for x := 0; x < 60; x++ {
+	// Cross streets (horizontal roads)
+	for y := 3; y < levelHeight; y += streetSpacing {
+		for x := 0; x < levelWidth; x++ {
 			level.AddEntity(NewRoad(x, y))
 		}
 	}
 
-	// City blocks (buildings) - Manhattan's rectangular blocks
-	for x := 0; x < 55; x += 12 {
-		for y := 0; y < 35; y += 8 {
-			if x+8 <= 60 && y+5 <= 40 {
-				level.AddEntity(tl.NewRectangle(x+5, y+1, 5, 5, blockColor))
+	// City blocks (buildings)
+	for x := 0; x < levelWidth-buildingWidth; x += avenueSpacing {
+		for y := 0; y < levelHeight-buildingHeight; y += streetSpacing {
+			if x+buildingWidth <= levelWidth && y+buildingHeight <= levelHeight {
+				level.AddEntity(tl.NewRectangle(
+					x+buildingOffset,
+					y+1,
+					buildingWidth,
+					buildingHeight,
+					blockColor,
+				))
 			}
 		}
 	}
