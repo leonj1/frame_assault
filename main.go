@@ -67,25 +67,36 @@ func GenerateEnemyMechs(number int) []*mech.Mech {
 	return enemyMechs
 }
 
-// Road represents a walkable road tile
-type Road struct {
+// RoadSystem represents a collection of road tiles managed by a single entity
+type RoadSystem struct {
 	*tl.Entity
+	roads map[int]map[int]bool
 }
 
-func NewRoad(x, y int) *Road {
-	road := &Road{
-		Entity: tl.NewEntity(x, y, 1, 1),
+func NewRoadSystem() *RoadSystem {
+	return &RoadSystem{
+		Entity: tl.NewEntity(0, 0, 1, 1),
+		roads:  make(map[int]map[int]bool),
 	}
-	return road
 }
 
-func (r *Road) Draw(s *tl.Screen) {
-	x, y := r.Position()
-	s.RenderCell(x, y, &tl.Cell{
-		Bg: tl.ColorBlue,
-		Fg: tl.ColorBlue,
-		Ch: ' ',
-	})
+func (r *RoadSystem) AddRoad(x, y int) {
+	if r.roads[x] == nil {
+		r.roads[x] = make(map[int]bool)
+	}
+	r.roads[x][y] = true
+}
+
+func (r *RoadSystem) Draw(s *tl.Screen) {
+	for x, yMap := range r.roads {
+		for y := range yMap {
+			s.RenderCell(x, y, &tl.Cell{
+				Bg: tl.ColorBlue,
+				Fg: tl.ColorBlue,
+				Ch: ' ',
+			})
+		}
+	}
 }
 
 const (
@@ -100,21 +111,25 @@ const (
 
 func createManhattanLayout(level *tl.BaseLevel) {
 	blockColor := tl.ColorMagenta // Buildings/blocks in magenta
+	roadSystem := NewRoadSystem()
 
 	// Main avenues (vertical roads)
 	for x := 3; x < levelWidth; x += avenueSpacing {
 		for y := 0; y < levelHeight; y++ {
-			level.AddEntity(NewRoad(x, y))
-			level.AddEntity(NewRoad(x+1, y))
+			roadSystem.AddRoad(x, y)
+			roadSystem.AddRoad(x+1, y)
 		}
 	}
 
 	// Cross streets (horizontal roads)
 	for y := 3; y < levelHeight; y += streetSpacing {
 		for x := 0; x < levelWidth; x++ {
-			level.AddEntity(NewRoad(x, y))
+			roadSystem.AddRoad(x, y)
 		}
 	}
+
+	// Add the road system as a single entity
+	level.AddEntity(roadSystem)
 
 	// City blocks (buildings)
 	for x := 0; x < levelWidth-buildingWidth; x += avenueSpacing {
