@@ -67,19 +67,45 @@ func GenerateEnemyMechs(number int) []*mech.Mech {
 	return enemyMechs
 }
 
+// Road represents a walkable road tile
+type Road struct {
+	*tl.Entity
+	x, y int
+}
+
+func NewRoad(x, y int) *Road {
+	road := &Road{
+		Entity: tl.NewEntity(x, y, 1, 1),
+		x:      x,
+		y:      y,
+	}
+	return road
+}
+
+func (r *Road) Draw(s *tl.Screen) {
+	s.RenderCell(r.x, r.y, &tl.Cell{
+		Bg: tl.ColorBlue,
+		Fg: tl.ColorBlue,
+		Ch: ' ',
+	})
+}
+
 func createManhattanLayout(level *tl.BaseLevel) {
-	// Colors for Manhattan layout
-	roadColor := tl.ColorBlue     // Roads in blue for better visibility
 	blockColor := tl.ColorMagenta // Buildings/blocks in magenta
 
 	// Main avenues (vertical roads) - Manhattan's major avenues
 	for x := 3; x < 60; x += 12 {
-		level.AddEntity(tl.NewRectangle(x, 0, 2, 40, roadColor))
+		for y := 0; y < 40; y++ {
+			level.AddEntity(NewRoad(x, y))
+			level.AddEntity(NewRoad(x+1, y))
+		}
 	}
 
 	// Cross streets (horizontal roads) - Manhattan's grid pattern
 	for y := 3; y < 40; y += 8 {
-		level.AddEntity(tl.NewRectangle(0, y, 60, 1, roadColor))
+		for x := 0; x < 60; x++ {
+			level.AddEntity(NewRoad(x, y))
+		}
 	}
 
 	// City blocks (buildings) - Manhattan's rectangular blocks
