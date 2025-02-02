@@ -50,9 +50,9 @@ func NewBuilding(x, y, width, height int, buildingType BuildingType) *Building {
 }
 
 func (b *Building) Draw(s *tl.Screen) {
+	x, y := b.Position()
 	for i := 0; i < b.width; i++ {
 		for j := 0; j < b.height; j++ {
-			x, y := b.Position()
 			// Draw building outline
 			if i == 0 || i == b.width-1 || j == 0 || j == b.height-1 {
 				s.RenderCell(x+i, y+j, &tl.Cell{
