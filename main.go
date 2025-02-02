@@ -114,7 +114,7 @@ func createManhattanLayout(level *tl.BaseLevel) {
 	roadSystem := NewRoadSystem()
 
 	// Main avenues (vertical roads)
-	for x := 3; x < levelWidth; x += avenueSpacing {
+	for x := buildingOffset - 2; x < levelWidth; x += avenueSpacing {
 		for y := 0; y < levelHeight; y++ {
 			roadSystem.AddRoad(x, y)
 			roadSystem.AddRoad(x+1, y)
@@ -122,7 +122,7 @@ func createManhattanLayout(level *tl.BaseLevel) {
 	}
 
 	// Cross streets (horizontal roads)
-	for y := 3; y < levelHeight; y += streetSpacing {
+	for y := buildingOffset; y < levelHeight; y += streetSpacing {
 		for x := 0; x < levelWidth; x++ {
 			roadSystem.AddRoad(x, y)
 		}
