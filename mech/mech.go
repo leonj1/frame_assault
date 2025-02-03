@@ -5,6 +5,7 @@ import (
 	"strconv"
 
 	"github.com/Ariemeth/frame_assault/mech/weapon"
+	"github.com/Ariemeth/frame_assault/util/debug"
 	"github.com/Ariemeth/frame_assault/util"
 	tl "github.com/Ariemeth/termloop"
 )
@@ -22,6 +23,13 @@ type Mech struct {
 	level        *tl.BaseLevel
 	notifier     util.Notifier
 }
+
+const (
+	// Game boundary constants
+	maxLevelWidth = 60
+	maxLevelHeight = 40
+	minCoordinate = -maxLevelWidth // Allow negative coordinates up to level width
+)
 
 // NewMech is used to create a new instance of a mech with default structure.
 func NewMech(name string, maxStructure, x, y int, color tl.Attr, symbol rune) *Mech {
@@ -111,23 +119,36 @@ func (m *Mech) Tick(event tl.Event) {
 	}
 }
 
-// Hit is call when a mech is hit
+// logAndNotify sends a message to both game log and notifier if they exist
+func (m *Mech) logAndNotify(message string) {
+	if m.game != nil {
+		m.game.Log(message)
+	}
+	if m.notifier != nil {
+		m.notifier.AddMessage(message)
+	}
+}
+
+// removeFromLevel removes the mech from the game level if possible
+func (m *Mech) removeFromLevel() {
+	if m.game == nil || m.game.Screen() == nil {
+		return
+	}
+	m.game.Screen().Level().RemoveEntity(m)
+}
+
+// Hit is called when a mech is hit
 func (m *Mech) Hit(damage int) {
-	//check if the mech is already destroyed
 	if m.structure <= 0 {
 		return
 	}
 
 	m.structure -= damage
-	message1 := m.name + " takes " + strconv.Itoa(damage)
-	m.game.Log(message1)
-	m.notifier.AddMessage(message1)
+	m.logAndNotify(m.name + " takes " + strconv.Itoa(damage))
 
 	if m.structure <= 0 {
-		message2 := m.name + " has been destroyed"
-		m.game.Log(message2)
-		m.notifier.AddMessage(message2)
-		m.game.Screen().Level().RemoveEntity(m)
+		m.logAndNotify(m.name + " has been destroyed")
+		m.removeFromLevel()
 	}
 }
 
@@ -171,4 +192,46 @@ func (m *Mech) attack(target weapon.Target) {
 	m.Fire((int)(distance), target)
 	m.game.Log("distance " + strconv.Itoa((int)(distance)))
 	m.game.Log("firer (%d,%d), target (%d,%d)", m.prevX, m.prevY, targetX, targetY)
+}
+
+// isValidMove checks if a move to the new position is valid
+func (m *Mech) isValidMove(newX, newY int) bool {
+	// Check game boundaries
+	if newX < minCoordinate || newX > maxLevelWidth ||
+		newY < minCoordinate || newY > maxLevelHeight {
+		if debug.MovementValidation && m.game != nil {
+			m.game.Log("%s attempted to move out of bounds to (%d,%d)", m.name, newX, newY)
+		}
+		return false
+	}
+
+	// Check for collisions with other entities if we have a level
+	if m.level != nil {
+		// Check for collisions with other entities
+		for _, entity := range m.level.Entities {
+			// Skip self and non-physical entities
+			if entity == m.entity || entity == nil {
+				continue
+			}
+			
+			// Check if entity implements Physical interface
+			physical, ok := entity.(tl.Physical)
+			if !ok {
+				continue
+			}
+
+			// Get entity position
+			eX, eY := physical.Position()
+			
+			// If entity is at target position, collision detected
+			if eX == newX && eY == newY {
+				if debug.MovementValidation && m.game != nil {
+					m.game.Log("%s attempted to move into occupied position (%d,%d)", m.name, newX, newY)
+				}
+				return false
+			}
+		}
+	}
+
+	return true
 }

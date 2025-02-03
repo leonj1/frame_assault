@@ -15,14 +15,11 @@ type PlayerMech struct {
 
 // NewPlayerMech is used to create a new instance of a mech with default structure.
 func NewPlayerMech(name string, maxStructure, x, y int, level *tl.BaseLevel) *PlayerMech {
+	newMech := NewMech(name, maxStructure, x, y, tl.ColorRed, 'M')
+	newMech.SetLevel(level)
+
 	newPlayerMech := PlayerMech{
-		Mech: *NewMech(
-			name,
-			maxStructure,
-			x,
-			y,
-			tl.ColorRed,
-			'M'),
+		Mech:  *newMech,
 		level: level,
 	}
 

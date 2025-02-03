@@ -2,11 +2,13 @@
 package main
 
 import (
+	"fmt"
 	"math/rand"
 	"time"
 
 	"github.com/Ariemeth/frame_assault/display"
 	"github.com/Ariemeth/frame_assault/mech"
+	"github.com/Ariemeth/frame_assault/mech/movement"
 	"github.com/Ariemeth/frame_assault/mech/weapon"
 	tl "github.com/Ariemeth/termloop"
 )
@@ -79,57 +81,138 @@ func (b *Building) Draw(s *tl.Screen) {
 	}
 }
 
+// mechConfig defines the configuration for creating an enemy mech
+type mechConfig struct {
+	name     string
+	symbol   rune
+	weapon   func() weapon.Weapon
+}
+
+// enemyMechConfigs defines the available enemy mech configurations
+var enemyMechConfigs = []mechConfig{
+	{"Mech A", 'A', weapon.CreateRifle},
+	{"Mech B", 'B', weapon.CreateRifle},
+	{"Mech C", 'C', weapon.CreateShotgun},
+	{"Mech D", 'D', weapon.CreateShotgun},
+	{"Mech E", 'E', weapon.CreateSword},
+	{"Mech F", 'F', weapon.CreateSword},
+	{"Mech G", 'G', weapon.CreateFist},
+	{"Mech H", 'H', weapon.CreateFist},
+}
+
+// getValidPatrolPoints generates patrol points that don't overlap with buildings
+func getValidPatrolPoints(x, y int, level *tl.BaseLevel) ([][2]int, error) {
+	// Try different patrol patterns until we find a valid one
+	patterns := []struct {
+		dx1, dy1, dx2, dy2 int
+	}{
+		// Horizontal patrol (left to right)
+		{buildingMargin, 1, buildingMargin + buildingSize, 1},
+		// Vertical patrol (top to bottom)
+		{buildingMargin, 0, buildingMargin, buildingSize},
+		// Diagonal patrol
+		{buildingMargin, 1, buildingMargin + buildingSize/2, buildingSize/2},
+	}
+
+	// Check each pattern for validity
+	for _, p := range patterns {
+		point1 := [2]int{x + p.dx1, y + p.dy1}
+		point2 := [2]int{x + p.dx2, y + p.dy2}
+
+		// Validate points are within bounds
+		if !isPointInBounds(point1[0], point1[1]) || !isPointInBounds(point2[0], point2[1]) {
+			continue
+		}
+
+		// Check for collisions with buildings
+		if !hasCollision(point1[0], point1[1], level) && !hasCollision(point2[0], point2[1], level) {
+			return [][2]int{point1, point2}, nil
+		}
+	}
+
+	return nil, fmt.Errorf("no valid patrol points found at position (%d,%d)", x, y)
+}
+
+// isPointInBounds checks if a point is within game boundaries
+func isPointInBounds(x, y int) bool {
+	return x >= minCoordinate && x <= maxLevelWidth &&
+		y >= minCoordinate && y <= maxLevelHeight
+}
+
+// hasCollision checks if a point collides with any physical entity
+func hasCollision(x, y int, level *tl.BaseLevel) bool {
+	for _, entity := range level.Entities {
+		if entity == nil {
+			continue
+		}
+
+		physical, ok := entity.(tl.Physical)
+		if !ok {
+			continue
+		}
+
+		// Get entity position and size
+		eX, eY := physical.Position()
+		if eX == x && eY == y {
+			return true
+		}
+	}
+	return false
+}
+
 // GenerateEnemyMechs creates a slice of mechs to be used as enemies
-func GenerateEnemyMechs(number int) []*mech.Mech {
-	enemyMechs := make([]*mech.Mech, 0, number)
+func GenerateEnemyMechs(number int, game *tl.Game, level *tl.BaseLevel) []*mech.EnemyMech {
+	enemyMechs := make([]*mech.EnemyMech, number)
+	r := rand.New(rand.NewSource(time.Now().UnixNano()))
 
-	r := rand.New(rand.NewSource(time.Now().Unix()))
+	for i := 0; i < number; i++ {
+		// Keep trying different positions until we find a valid one
+		var strategy movement.Strategy
+		var finalX, finalY int
 
-	for i := 1; i <= number; i++ {
-		var m *mech.Mech
+		for attempts := 0; attempts < 10; attempts++ {
+			// Random starting position
+			x := -15 + r.Intn(30)
+			y := -15 + r.Intn(30)
 
-		chance := i % 8
-		x := -15 + r.Intn(30)
-		y := -15 + r.Intn(30)
+			// Try to get valid patrol points
+			patrolPoints, err := getValidPatrolPoints(x, y, level)
+			if err != nil {
+				if attempts == 9 { // Last attempt, fallback to random walk
+					strategy = movement.NewRandomWalkStrategy()
+					finalX, finalY = x, y // Use last attempted position
+					if game != nil {
+						game.Log("Failed to find valid patrol points after %d attempts, using random walk", attempts+1)
+					}
+				}
+				continue
+			}
 
-		switch chance {
-		case 0:
-			m = mech.NewMech("Mech A", i, x, y, tl.ColorRed, rune('A'))
-			m.AddWeapon(weapon.CreateRifle())
-			break
-		case 1:
-			m = mech.NewMech("Mech B", i, x, y, tl.ColorRed, rune('B'))
-			m.AddWeapon(weapon.CreateRifle())
-			break
-		case 2:
-			m = mech.NewMech("Mech C", i, x, y, tl.ColorRed, rune('C'))
-			m.AddWeapon(weapon.CreateShotgun())
-			break
-		case 3:
-			m = mech.NewMech("Mech D", i, x, y, tl.ColorRed, rune('D'))
-			m.AddWeapon(weapon.CreateShotgun())
-			break
-		case 4:
-			m = mech.NewMech("Mech E", i, x, y, tl.ColorRed, rune('E'))
-			m.AddWeapon(weapon.CreateFist())
-			break
-		case 5:
-			m = mech.NewMech("Mech F", i, x, y, tl.ColorRed, rune('F'))
-			m.AddWeapon(weapon.CreateFist())
-			break
-		case 6:
-			m = mech.NewMech("Mech G", i, x, y, tl.ColorRed, rune('G'))
-			m.AddWeapon(weapon.CreateSword())
-			break
-		case 7:
-			m = mech.NewMech("Mech H", i, x, y, tl.ColorRed, rune('H'))
-			m.AddWeapon(weapon.CreateSword())
+			// Create patrol strategy with valid points
+			patrolStrategy, err := movement.NewPatrolStrategy(patrolPoints)
+			if err != nil {
+				if game != nil {
+					game.Log("Failed to create patrol strategy: %v, falling back to random walk", err)
+				}
+				strategy = movement.NewRandomWalkStrategy()
+			} else {
+				strategy = patrolStrategy
+			}
+			finalX, finalY = x, y // Use position where valid patrol points were found
 			break
 		}
 
-		if m != nil {
-			enemyMechs = append(enemyMechs, m)
+		// If no strategy was created (shouldn't happen due to random walk fallback)
+		if strategy == nil {
+			strategy = movement.NewRandomWalkStrategy()
 		}
+
+		// Create enemy mech using configuration
+		config := enemyMechConfigs[i%len(enemyMechConfigs)]
+		m := mech.NewEnemyMech(config.name, i, finalX, finalY, tl.ColorRed, config.symbol, strategy)
+		m.AddWeapon(config.weapon())
+		m.AttachGame(game)
+		enemyMechs[i] = m
 	}
 
 	return enemyMechs
@@ -171,17 +254,29 @@ const (
 	levelWidth     = 60
 	levelHeight    = 40
 	avenueSpacing  = 12
-	streetSpacing  = 8
-	buildingWidth  = 5
-	buildingHeight = 5
-	buildingOffset = 5
+	streetSpacing  = 6
+	buildingMargin = 2
+	buildingSize   = 4
+	gameFPS       = 10 // Run at 10 FPS for smoother animation while keeping slow movement
+	minCoordinate = 0
+	maxLevelWidth = levelWidth - 1
+	maxLevelHeight = levelHeight - 1
 )
+
+// getSafeSpawnPosition returns a position that is not on a road or building
+func getSafeSpawnPosition() (x, y int) {
+	// Position player in the middle of a block between roads
+	// Add buildingMargin to avoid spawning too close to buildings
+	x = buildingMargin + avenueSpacing/2
+	y = buildingMargin + streetSpacing/2
+	return x, y
+}
 
 func createManhattanLayout(level *tl.BaseLevel) {
 	roadSystem := NewRoadSystem()
 
 	// Main avenues (vertical roads)
-	for x := buildingOffset - 2; x < levelWidth; x += avenueSpacing {
+	for x := buildingMargin - 2; x < levelWidth; x += avenueSpacing {
 		for y := 0; y < levelHeight; y++ {
 			roadSystem.AddRoad(x, y)
 			roadSystem.AddRoad(x+1, y)
@@ -189,7 +284,7 @@ func createManhattanLayout(level *tl.BaseLevel) {
 	}
 
 	// Cross streets (horizontal roads)
-	for y := buildingOffset; y < levelHeight; y += streetSpacing {
+	for y := buildingMargin; y < levelHeight; y += streetSpacing {
 		for x := 0; x < levelWidth; x++ {
 			roadSystem.AddRoad(x, y)
 		}
@@ -200,16 +295,16 @@ func createManhattanLayout(level *tl.BaseLevel) {
 
 	// City blocks (buildings)
 	buildingIndex := 0
-	for x := 0; x < levelWidth-buildingWidth; x += avenueSpacing {
-		for y := 0; y < levelHeight-buildingHeight; y += streetSpacing {
-			if x+buildingWidth <= levelWidth && y+buildingHeight <= levelHeight {
+	for x := 0; x < levelWidth-buildingSize; x += avenueSpacing {
+		for y := 0; y < levelHeight-buildingSize; y += streetSpacing {
+			if x+buildingSize <= levelWidth && y+buildingSize <= levelHeight {
 				// Cycle through building types
 				buildingType := buildingTypes[buildingIndex%len(buildingTypes)]
 				building := NewBuilding(
-					x+buildingOffset,
+					x+buildingMargin,
 					y+1,
-					buildingWidth,
-					buildingHeight,
+					buildingSize,
+					buildingSize,
 					buildingType,
 				)
 				level.AddEntity(building)
@@ -222,6 +317,7 @@ func createManhattanLayout(level *tl.BaseLevel) {
 func main() {
 	//Create the game
 	game := tl.NewGame()
+	game.Screen().SetFps(gameFPS)
 
 	//Create the level for the game
 	level := tl.NewBaseLevel(tl.Cell{
@@ -237,36 +333,34 @@ func main() {
 	notification := display.NewNotification(25, 0, 45, 6, level)
 
 	//Create the enemy mechs
-	enemies := GenerateEnemyMechs(8)
-	for _, enemy := range enemies {
-		enemy.AttachGame(game)
-		enemy.AttachNotifier(notification)
+	enemies := GenerateEnemyMechs(8, game, level)
+	enemyMechs := make([]*mech.Mech, len(enemies))
+	for i, enemy := range enemies {
 		enemy.SetLevel(level)
+		enemy.AttachNotifier(notification)
 		level.AddEntity(enemy)
+		enemyMechs[i] = enemy.Mech
 	}
 
-	//Create the player's mech
-	player := mech.NewPlayerMech("Player", 10, 1, 1, level)
-	weapon1 := weapon.CreateRifle()
-	player.AddWeapon(weapon1)
-	player.SetEnemyList(enemies)
+	//Create the player mech
+	spawnX, spawnY := getSafeSpawnPosition()
+	player := mech.NewPlayerMech("Player", 10, spawnX, spawnY, level)
 	player.AttachGame(game)
 	player.AttachNotifier(notification)
-	player.SetLevel(level)
+	player.SetEnemyList(enemyMechs)
 	level.AddEntity(player)
+	player.AddWeapon(weapon.CreateRifle())
 
-	//Create the players mech status display
-	status := display.NewPlayerStatus(0, 0, 20, 13, player, level)
+	//Create the player status display
+	playerStatus := display.NewPlayerStatus(0, 0, 25, 6, player, level)
+	level.AddEntity(playerStatus)
 
-	//Attach the displays the the level
-	level.AddEntity(status)
+	//Create the notification display
 	level.AddEntity(notification)
 
-	//Set the level to be the current game level
+	//Set the level
 	game.Screen().SetLevel(level)
 
-	game.SetDebugOn(false)
-
-	//Start the game engine
+	//Start the game
 	game.Start()
 }
