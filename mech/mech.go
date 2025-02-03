@@ -23,6 +23,13 @@ type Mech struct {
 	notifier     util.Notifier
 }
 
+const (
+	// Game boundary constants
+	maxLevelWidth = 60
+	maxLevelHeight = 40
+	minCoordinate = -maxLevelWidth // Allow negative coordinates up to level width
+)
+
 // NewMech is used to create a new instance of a mech with default structure.
 func NewMech(name string, maxStructure, x, y int, color tl.Attr, symbol rune) *Mech {
 	newMech := Mech{
@@ -171,4 +178,46 @@ func (m *Mech) attack(target weapon.Target) {
 	m.Fire((int)(distance), target)
 	m.game.Log("distance " + strconv.Itoa((int)(distance)))
 	m.game.Log("firer (%d,%d), target (%d,%d)", m.prevX, m.prevY, targetX, targetY)
+}
+
+// isValidMove checks if a move to the new position is valid
+func (m *Mech) isValidMove(newX, newY int) bool {
+	// Check game boundaries
+	if newX < minCoordinate || newX > maxLevelWidth ||
+		newY < minCoordinate || newY > maxLevelHeight {
+		if m.game != nil {
+			m.game.Log("%s attempted to move out of bounds to (%d,%d)", m.name, newX, newY)
+		}
+		return false
+	}
+
+	// Check for collisions with other entities if we have a level
+	if m.level != nil {
+		// Check for collisions with other entities
+		for _, entity := range m.level.Entities {
+			// Skip self and non-physical entities
+			if entity == m.entity || entity == nil {
+				continue
+			}
+			
+			// Check if entity implements Physical interface
+			physical, ok := entity.(tl.Physical)
+			if !ok {
+				continue
+			}
+
+			// Get entity position
+			eX, eY := physical.Position()
+			
+			// If entity is at target position, collision detected
+			if eX == newX && eY == newY {
+				if m.game != nil {
+					m.game.Log("%s attempted to move into occupied position (%d,%d)", m.name, newX, newY)
+				}
+				return false
+			}
+		}
+	}
+
+	return true
 }

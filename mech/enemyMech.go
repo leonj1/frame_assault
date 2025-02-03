@@ -47,9 +47,14 @@ func (e *EnemyMech) Tick(event tl.Event) {
 			// Get current position
 			currentX, currentY := e.Position()
 			
-			// Calculate next position using strategy
+			// Get next move from strategy
 			newX, newY := e.moveStrategy.NextMove(currentX, currentY)
-			
+
+			// Validate move before applying
+			if !e.isValidMove(newX, newY) {
+				return
+			}
+
 			if e.game != nil {
 				e.game.Log("Enemy %s moving from (%d,%d) to (%d,%d)", 
 					e.Name(), currentX, currentY, newX, newY)
