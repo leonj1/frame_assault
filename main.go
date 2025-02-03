@@ -80,6 +80,25 @@ func (b *Building) Draw(s *tl.Screen) {
 	}
 }
 
+// mechConfig defines the configuration for creating an enemy mech
+type mechConfig struct {
+	name     string
+	symbol   rune
+	weapon   func() weapon.Weapon
+}
+
+// enemyMechConfigs defines the available enemy mech configurations
+var enemyMechConfigs = []mechConfig{
+	{"Mech A", 'A', weapon.CreateRifle},
+	{"Mech B", 'B', weapon.CreateRifle},
+	{"Mech C", 'C', weapon.CreateShotgun},
+	{"Mech D", 'D', weapon.CreateShotgun},
+	{"Mech E", 'E', weapon.CreateSword},
+	{"Mech F", 'F', weapon.CreateSword},
+	{"Mech G", 'G', weapon.CreateFist},
+	{"Mech H", 'H', weapon.CreateFist},
+}
+
 // GenerateEnemyMechs creates a slice of mechs to be used as enemies
 func GenerateEnemyMechs(number int, game *tl.Game) []*mech.EnemyMech {
 	enemyMechs := make([]*mech.EnemyMech, number)
@@ -96,6 +115,7 @@ func GenerateEnemyMechs(number int, game *tl.Game) []*mech.EnemyMech {
 			{x + buildingMargin + buildingSize, y + 1},
 		}
 
+		// Create movement strategy
 		var strategy movement.Strategy
 		patrolStrategy, err := movement.NewPatrolStrategy(patrolPoints)
 		if err != nil {
@@ -108,43 +128,12 @@ func GenerateEnemyMechs(number int, game *tl.Game) []*mech.EnemyMech {
 			strategy = patrolStrategy
 		}
 
-		// Create enemy mech with the strategy
-		chance := i % 8
-		switch chance {
-		case 0:
-			m := mech.NewEnemyMech("Mech A", i, x, y, tl.ColorRed, rune('A'), strategy)
-			m.AddWeapon(weapon.CreateRifle())
-			enemyMechs[i] = m
-		case 1:
-			m := mech.NewEnemyMech("Mech B", i, x, y, tl.ColorRed, rune('B'), strategy)
-			m.AddWeapon(weapon.CreateRifle())
-			enemyMechs[i] = m
-		case 2:
-			m := mech.NewEnemyMech("Mech C", i, x, y, tl.ColorRed, rune('C'), strategy)
-			m.AddWeapon(weapon.CreateShotgun())
-			enemyMechs[i] = m
-		case 3:
-			m := mech.NewEnemyMech("Mech D", i, x, y, tl.ColorRed, rune('D'), strategy)
-			m.AddWeapon(weapon.CreateShotgun())
-			enemyMechs[i] = m
-		case 4:
-			m := mech.NewEnemyMech("Mech E", i, x, y, tl.ColorRed, rune('E'), strategy)
-			m.AddWeapon(weapon.CreateSword())
-			enemyMechs[i] = m
-		case 5:
-			m := mech.NewEnemyMech("Mech F", i, x, y, tl.ColorRed, rune('F'), strategy)
-			m.AddWeapon(weapon.CreateSword())
-			enemyMechs[i] = m
-		case 6:
-			m := mech.NewEnemyMech("Mech G", i, x, y, tl.ColorRed, rune('G'), strategy)
-			m.AddWeapon(weapon.CreateFist())
-			enemyMechs[i] = m
-		case 7:
-			m := mech.NewEnemyMech("Mech H", i, x, y, tl.ColorRed, rune('H'), strategy)
-			m.AddWeapon(weapon.CreateFist())
-			enemyMechs[i] = m
-		}
-		enemyMechs[i].AttachGame(game)
+		// Create enemy mech using configuration
+		config := enemyMechConfigs[i%len(enemyMechConfigs)]
+		m := mech.NewEnemyMech(config.name, i, x, y, tl.ColorRed, config.symbol, strategy)
+		m.AddWeapon(config.weapon())
+		m.AttachGame(game)
+		enemyMechs[i] = m
 	}
 
 	return enemyMechs
