@@ -78,11 +78,31 @@ func (s *RandomWalkStrategy) accumulateSteps() (dx, dy int) {
 	return dx, dy
 }
 
+// clampToGameBounds ensures a coordinate stays within game boundaries
+func clampToGameBounds(val, min, max int) int {
+	if val < min {
+		return min
+	}
+	if val > max {
+		return max
+	}
+	return val
+}
+
 // NextMove implements Strategy interface
 func (s *RandomWalkStrategy) NextMove(currentX, currentY int) (newX, newY int) {
 	s.updateDirection()
 	dx, dy := s.accumulateSteps()
-	return currentX + dx, currentY + dy
+	
+	// Calculate new position
+	newX = currentX + dx
+	newY = currentY + dy
+	
+	// Clamp to game boundaries
+	newX = clampToGameBounds(newX, minCoordinate, maxLevelWidth)
+	newY = clampToGameBounds(newY, minCoordinate, maxLevelHeight)
+	
+	return newX, newY
 }
 
 // PatrolStrategy makes the mech patrol between points
@@ -93,6 +113,7 @@ type PatrolStrategy struct {
 	stepY      float64
 	targetX    int
 	targetY    int
+	direction  float64
 }
 
 // validatePoint checks if a point is within game boundaries
@@ -131,58 +152,48 @@ func NewPatrolStrategy(points [][2]int) (*PatrolStrategy, error) {
 
 // updateTarget moves to the next patrol point if current target is reached
 func (s *PatrolStrategy) updateTarget(currentX, currentY int) {
+	// Check if we've reached the current target
 	if currentX == s.targetX && currentY == s.targetY {
 		s.currPoint = (s.currPoint + 1) % len(s.points)
 		s.targetX = s.points[s.currPoint][0]
 		s.targetY = s.points[s.currPoint][1]
 	}
-}
 
-// calculateSteps accumulates movement steps toward target
-func (s *PatrolStrategy) calculateSteps(currentX, currentY int) (moveX, moveY int) {
+	// Calculate direction to target
 	dx := float64(s.targetX - currentX)
 	dy := float64(s.targetY - currentY)
-
-	dx, dy = s.normalizeDirection(dx, dy)
-	s.accumulateSteps(dx, dy)
-	return s.getIntegerSteps()
+	s.direction = math.Atan2(dy, dx)
 }
 
-// normalizeDirection normalizes the direction vector without using square root
-func (s *PatrolStrategy) normalizeDirection(dx, dy float64) (float64, float64) {
-	dxAbs, dyAbs := math.Abs(dx), math.Abs(dy)
-	if dxAbs == 0 && dyAbs == 0 {
-		return 0, 0
-	}
+// accumulateSteps updates step values based on current direction and returns integer movements
+func (s *PatrolStrategy) accumulateSteps() (dx, dy int) {
+	s.stepX += math.Cos(s.direction) * moveStep
+	s.stepY += math.Sin(s.direction) * moveStep
 
-	if dxAbs > dyAbs {
-		return dx/dxAbs, dy/dxAbs
-	}
-	return dx/dyAbs, dy/dyAbs
-}
-
-// accumulateSteps adds the normalized direction to the current steps
-func (s *PatrolStrategy) accumulateSteps(dx, dy float64) {
-	s.stepX += dx * moveStep
-	s.stepY += dy * moveStep
-}
-
-// getIntegerSteps converts accumulated steps to integer movements
-func (s *PatrolStrategy) getIntegerSteps() (moveX, moveY int) {
+	// Convert to integer movements
 	if math.Abs(s.stepX) >= minStepThreshold {
-		moveX = int(math.Round(s.stepX))
-		s.stepX -= float64(moveX)
+		dx = int(math.Round(s.stepX))
+		s.stepX -= float64(dx)
 	}
 	if math.Abs(s.stepY) >= minStepThreshold {
-		moveY = int(math.Round(s.stepY))
-		s.stepY -= float64(moveY)
+		dy = int(math.Round(s.stepY))
+		s.stepY -= float64(dy)
 	}
-	return moveX, moveY
+	return dx, dy
 }
 
 // NextMove implements Strategy interface
 func (s *PatrolStrategy) NextMove(currentX, currentY int) (newX, newY int) {
 	s.updateTarget(currentX, currentY)
-	moveX, moveY := s.calculateSteps(currentX, currentY)
-	return currentX + moveX, currentY + moveY
+	dx, dy := s.accumulateSteps()
+	
+	// Calculate new position
+	newX = currentX + dx
+	newY = currentY + dy
+	
+	// Clamp to game boundaries
+	newX = clampToGameBounds(newX, minCoordinate, maxLevelWidth)
+	newY = clampToGameBounds(newY, minCoordinate, maxLevelHeight)
+	
+	return newX, newY
 }
