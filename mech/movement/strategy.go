@@ -2,6 +2,7 @@
 package movement
 
 import (
+	"fmt"
 	"math"
 	"math/rand"
 	"sync"
@@ -13,6 +14,11 @@ const (
 	moveStep = 0.1 // Slower movement speed
 	directionChangeChance = 0.1
 	minStepThreshold = 1.0 // Minimum step size for movement
+
+	// Game boundary constants
+	maxLevelWidth = 60
+	maxLevelHeight = 40
+	minCoordinate = -maxLevelWidth // Allow negative coordinates up to level width
 )
 
 // Strategy defines the interface for mech movement behaviors
@@ -89,11 +95,30 @@ type PatrolStrategy struct {
 	targetY    int
 }
 
+// validatePoint checks if a point is within game boundaries
+func validatePoint(x, y int) error {
+	if x < minCoordinate || x > maxLevelWidth {
+		return fmt.Errorf("x coordinate %d is out of bounds [%d, %d]", x, minCoordinate, maxLevelWidth)
+	}
+	if y < minCoordinate || y > maxLevelHeight {
+		return fmt.Errorf("y coordinate %d is out of bounds [%d, %d]", y, minCoordinate, maxLevelHeight)
+	}
+	return nil
+}
+
 // NewPatrolStrategy creates a new patrol movement strategy
 func NewPatrolStrategy(points [][2]int) *PatrolStrategy {
 	if len(points) < 2 {
 		panic("PatrolStrategy requires at least 2 points")
 	}
+
+	// Validate all points are within bounds
+	for i, point := range points {
+		if err := validatePoint(point[0], point[1]); err != nil {
+			panic(fmt.Sprintf("patrol point %d is invalid: %v", i, err))
+		}
+	}
+
 	return &PatrolStrategy{
 		points:    points,
 		currPoint: 0,
