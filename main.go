@@ -15,22 +15,23 @@ import (
 
 // BuildingType represents different types of buildings
 type BuildingType struct {
-	name  string
-	color tl.Attr
-	char  rune
+	name     string
+	color    tl.Attr
+	char     rune
+	maxCount int
 }
 
 var buildingTypes = []BuildingType{
-	{"Hospital", tl.ColorRed, 'H'},
-	{"School", tl.ColorYellow, 'S'},
-	{"Bank", tl.ColorGreen, 'B'},
-	{"Grocery", tl.ColorCyan, 'G'},
-	{"Police", tl.ColorBlue, 'P'},
-	{"Library", tl.ColorMagenta, 'L'},
-	{"Mall", tl.ColorWhite, 'M'},
-	{"Restaurant", tl.ColorRed, 'R'},
-	{"Theater", tl.ColorYellow, 'T'},
-	{"Gym", tl.ColorGreen, 'Y'},
+	{"Hospital", tl.ColorRed, 'H', 1},
+	{"School", tl.ColorYellow, 'S', 2},
+	{"Bank", tl.ColorGreen, 'B', 2},
+	{"Grocery", tl.ColorCyan, 'G', 3},
+	{"Police", tl.ColorBlue, 'P', 2},
+	{"Library", tl.ColorMagenta, 'L', 2},
+	{"Mall", tl.ColorWhite, 'M', 2},
+	{"Restaurant", tl.ColorRed, 'R', 4},
+	{"Theater", tl.ColorYellow, 'T', 2},
+	{"Gym", tl.ColorGreen, 'Y', 3},
 }
 
 // Building represents a city building with a specific purpose
@@ -293,13 +294,34 @@ func createManhattanLayout(level *tl.BaseLevel) {
 	// Add the road system as a single entity
 	level.AddEntity(roadSystem)
 
+	// Track building counts
+	buildingCounts := make(map[string]int)
+	for _, bt := range buildingTypes {
+		buildingCounts[bt.name] = 0
+	}
+
 	// City blocks (buildings)
 	buildingIndex := 0
 	for x := 0; x < levelWidth-buildingSize; x += avenueSpacing {
 		for y := 0; y < levelHeight-buildingSize; y += streetSpacing {
 			if x+buildingSize <= levelWidth && y+buildingSize <= levelHeight {
-				// Cycle through building types
-				buildingType := buildingTypes[buildingIndex%len(buildingTypes)]
+				// Find next available building type
+				var buildingType BuildingType
+				for attempts := 0; attempts < len(buildingTypes); attempts++ {
+					candidateType := buildingTypes[buildingIndex%len(buildingTypes)]
+					if buildingCounts[candidateType.name] < candidateType.maxCount {
+						buildingType = candidateType
+						buildingCounts[buildingType.name]++
+						break
+					}
+					buildingIndex++
+				}
+
+				// Skip if no building type available
+				if buildingType.name == "" {
+					continue
+				}
+
 				building := NewBuilding(
 					x+buildingMargin,
 					y+1,
