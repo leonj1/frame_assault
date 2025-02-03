@@ -7,6 +7,7 @@ import (
 
 	"github.com/Ariemeth/frame_assault/display"
 	"github.com/Ariemeth/frame_assault/mech"
+	"github.com/Ariemeth/frame_assault/mech/movement"
 	"github.com/Ariemeth/frame_assault/mech/weapon"
 	tl "github.com/Ariemeth/termloop"
 )
@@ -80,56 +81,62 @@ func (b *Building) Draw(s *tl.Screen) {
 }
 
 // GenerateEnemyMechs creates a slice of mechs to be used as enemies
-func GenerateEnemyMechs(number int) []*mech.Mech {
-	enemyMechs := make([]*mech.Mech, 0, number)
+func GenerateEnemyMechs(number int) []*mech.EnemyMech {
+	enemyMechs := make([]*mech.EnemyMech, 0, number)
+	r := rand.New(rand.NewSource(time.Now().UnixNano()))
 
-	r := rand.New(rand.NewSource(time.Now().Unix()))
+	// Create patrol points for different areas of the map
+	patrolAreas := [][][2]int{
+		{{-15, -15}, {15, -15}, {15, 15}, {-15, 15}}, // Outer patrol
+		{{-8, -8}, {8, -8}, {8, 8}, {-8, 8}},         // Inner patrol
+		{{-5, 0}, {5, 0}},                             // Horizontal patrol
+		{{0, -5}, {0, 5}},                             // Vertical patrol
+	}
 
 	for i := 1; i <= number; i++ {
-		var m *mech.Mech
-
-		chance := i % 8
+		var m *mech.EnemyMech
 		x := -15 + r.Intn(30)
 		y := -15 + r.Intn(30)
 
-		switch chance {
-		case 0:
-			m = mech.NewMech("Mech A", i, x, y, tl.ColorRed, rune('A'))
-			m.AddWeapon(weapon.CreateRifle())
-			break
-		case 1:
-			m = mech.NewMech("Mech B", i, x, y, tl.ColorRed, rune('B'))
-			m.AddWeapon(weapon.CreateRifle())
-			break
-		case 2:
-			m = mech.NewMech("Mech C", i, x, y, tl.ColorRed, rune('C'))
-			m.AddWeapon(weapon.CreateShotgun())
-			break
-		case 3:
-			m = mech.NewMech("Mech D", i, x, y, tl.ColorRed, rune('D'))
-			m.AddWeapon(weapon.CreateShotgun())
-			break
-		case 4:
-			m = mech.NewMech("Mech E", i, x, y, tl.ColorRed, rune('E'))
-			m.AddWeapon(weapon.CreateFist())
-			break
-		case 5:
-			m = mech.NewMech("Mech F", i, x, y, tl.ColorRed, rune('F'))
-			m.AddWeapon(weapon.CreateFist())
-			break
-		case 6:
-			m = mech.NewMech("Mech G", i, x, y, tl.ColorRed, rune('G'))
-			m.AddWeapon(weapon.CreateSword())
-			break
-		case 7:
-			m = mech.NewMech("Mech H", i, x, y, tl.ColorRed, rune('H'))
-			m.AddWeapon(weapon.CreateSword())
-			break
+		// Choose movement strategy
+		var strategy movement.Strategy
+		if i%2 == 0 {
+			strategy = movement.NewRandomWalkStrategy()
+		} else {
+			patrolPoints := patrolAreas[i%len(patrolAreas)]
+			strategy = movement.NewPatrolStrategy(patrolPoints)
 		}
 
-		if m != nil {
-			enemyMechs = append(enemyMechs, m)
+		// Create enemy mech with different types
+		chance := i % 8
+		switch chance {
+		case 0:
+			m = mech.NewEnemyMech("Mech A", i, x, y, tl.ColorRed, rune('A'), strategy)
+			m.AddWeapon(weapon.CreateRifle())
+		case 1:
+			m = mech.NewEnemyMech("Mech B", i, x, y, tl.ColorRed, rune('B'), strategy)
+			m.AddWeapon(weapon.CreateRifle())
+		case 2:
+			m = mech.NewEnemyMech("Mech C", i, x, y, tl.ColorRed, rune('C'), strategy)
+			m.AddWeapon(weapon.CreateShotgun())
+		case 3:
+			m = mech.NewEnemyMech("Mech D", i, x, y, tl.ColorRed, rune('D'), strategy)
+			m.AddWeapon(weapon.CreateShotgun())
+		case 4:
+			m = mech.NewEnemyMech("Mech E", i, x, y, tl.ColorRed, rune('E'), strategy)
+			m.AddWeapon(weapon.CreateSword())
+		case 5:
+			m = mech.NewEnemyMech("Mech F", i, x, y, tl.ColorRed, rune('F'), strategy)
+			m.AddWeapon(weapon.CreateSword())
+		case 6:
+			m = mech.NewEnemyMech("Mech G", i, x, y, tl.ColorRed, rune('G'), strategy)
+			m.AddWeapon(weapon.CreateFist())
+		case 7:
+			m = mech.NewEnemyMech("Mech H", i, x, y, tl.ColorRed, rune('H'), strategy)
+			m.AddWeapon(weapon.CreateFist())
 		}
+
+		enemyMechs = append(enemyMechs, m)
 	}
 
 	return enemyMechs
@@ -171,17 +178,17 @@ const (
 	levelWidth     = 60
 	levelHeight    = 40
 	avenueSpacing  = 12
-	streetSpacing  = 8
-	buildingWidth  = 5
-	buildingHeight = 5
-	buildingOffset = 5
+	streetSpacing  = 6
+	buildingMargin = 2
+	buildingSize   = 4
+	gameFPS       = 10 // Run at 10 FPS for smoother animation while keeping slow movement
 )
 
 func createManhattanLayout(level *tl.BaseLevel) {
 	roadSystem := NewRoadSystem()
 
 	// Main avenues (vertical roads)
-	for x := buildingOffset - 2; x < levelWidth; x += avenueSpacing {
+	for x := buildingMargin - 2; x < levelWidth; x += avenueSpacing {
 		for y := 0; y < levelHeight; y++ {
 			roadSystem.AddRoad(x, y)
 			roadSystem.AddRoad(x+1, y)
@@ -189,7 +196,7 @@ func createManhattanLayout(level *tl.BaseLevel) {
 	}
 
 	// Cross streets (horizontal roads)
-	for y := buildingOffset; y < levelHeight; y += streetSpacing {
+	for y := buildingMargin; y < levelHeight; y += streetSpacing {
 		for x := 0; x < levelWidth; x++ {
 			roadSystem.AddRoad(x, y)
 		}
@@ -200,16 +207,16 @@ func createManhattanLayout(level *tl.BaseLevel) {
 
 	// City blocks (buildings)
 	buildingIndex := 0
-	for x := 0; x < levelWidth-buildingWidth; x += avenueSpacing {
-		for y := 0; y < levelHeight-buildingHeight; y += streetSpacing {
-			if x+buildingWidth <= levelWidth && y+buildingHeight <= levelHeight {
+	for x := 0; x < levelWidth-buildingSize; x += avenueSpacing {
+		for y := 0; y < levelHeight-buildingSize; y += streetSpacing {
+			if x+buildingSize <= levelWidth && y+buildingSize <= levelHeight {
 				// Cycle through building types
 				buildingType := buildingTypes[buildingIndex%len(buildingTypes)]
 				building := NewBuilding(
-					x+buildingOffset,
+					x+buildingMargin,
 					y+1,
-					buildingWidth,
-					buildingHeight,
+					buildingSize,
+					buildingSize,
 					buildingType,
 				)
 				level.AddEntity(building)
@@ -222,6 +229,7 @@ func createManhattanLayout(level *tl.BaseLevel) {
 func main() {
 	//Create the game
 	game := tl.NewGame()
+	game.Screen().SetFps(gameFPS)
 
 	//Create the level for the game
 	level := tl.NewBaseLevel(tl.Cell{
@@ -238,35 +246,33 @@ func main() {
 
 	//Create the enemy mechs
 	enemies := GenerateEnemyMechs(8)
-	for _, enemy := range enemies {
+	enemyMechs := make([]*mech.Mech, len(enemies))
+	for i, enemy := range enemies {
 		enemy.AttachGame(game)
 		enemy.AttachNotifier(notification)
 		enemy.SetLevel(level)
 		level.AddEntity(enemy)
+		enemyMechs[i] = enemy.Mech
 	}
 
-	//Create the player's mech
-	player := mech.NewPlayerMech("Player", 10, 1, 1, level)
-	weapon1 := weapon.CreateRifle()
-	player.AddWeapon(weapon1)
-	player.SetEnemyList(enemies)
+	//Create the player mech
+	player := mech.NewPlayerMech("Player", 10, 0, 0, level)
 	player.AttachGame(game)
 	player.AttachNotifier(notification)
-	player.SetLevel(level)
+	player.SetEnemyList(enemyMechs)
+	player.AddWeapon(weapon.CreateRifle())
 	level.AddEntity(player)
 
-	//Create the players mech status display
-	status := display.NewPlayerStatus(0, 0, 20, 13, player, level)
+	//Create the player status display
+	playerStatus := display.NewPlayerStatus(0, 0, 25, 6, player, level)
+	level.AddEntity(playerStatus)
 
-	//Attach the displays the the level
-	level.AddEntity(status)
+	//Create the notification display
 	level.AddEntity(notification)
 
-	//Set the level to be the current game level
+	//Set the level
 	game.Screen().SetLevel(level)
 
-	game.SetDebugOn(false)
-
-	//Start the game engine
+	//Start the game
 	game.Start()
 }

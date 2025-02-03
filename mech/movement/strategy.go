@@ -1,0 +1,137 @@
+// Package movement provides movement strategies for mechs
+package movement
+
+import (
+	"math"
+	"math/rand"
+	"time"
+)
+
+const (
+	// Movement constants
+	moveStep = 0.1 // Slower movement speed
+	directionChangeChance = 0.1
+)
+
+// Strategy defines the interface for mech movement behaviors
+type Strategy interface {
+	// NextMove calculates the next x,y position based on current position
+	NextMove(currentX, currentY int) (newX, newY int)
+}
+
+// RandomWalkStrategy makes the mech move randomly in any direction
+type RandomWalkStrategy struct {
+	rng       *rand.Rand
+	direction float64
+	stepX     float64
+	stepY     float64
+}
+
+// NewRandomWalkStrategy creates a new random walk movement strategy
+func NewRandomWalkStrategy() *RandomWalkStrategy {
+	return &RandomWalkStrategy{
+		rng:       rand.New(rand.NewSource(time.Now().UnixNano())),
+		direction: 0,
+		stepX:     0,
+		stepY:     0,
+	}
+}
+
+// updateDirection changes direction with a random chance
+func (s *RandomWalkStrategy) updateDirection() {
+	if s.stepX == 0 && s.stepY == 0 || s.rng.Float64() < directionChangeChance {
+		s.direction = s.rng.Float64() * 2 * math.Pi
+		s.stepX = math.Cos(s.direction) * moveStep
+		s.stepY = math.Sin(s.direction) * moveStep
+	}
+}
+
+// accumulateSteps updates step values based on current direction
+func (s *RandomWalkStrategy) accumulateSteps() (dx, dy int) {
+	s.stepX += math.Cos(s.direction) * moveStep
+	s.stepY += math.Sin(s.direction) * moveStep
+	return s.getIntegerSteps()
+}
+
+// getIntegerSteps converts accumulated steps to integer movements
+func (s *RandomWalkStrategy) getIntegerSteps() (dx, dy int) {
+	if math.Abs(s.stepX) >= 1 {
+		dx = int(math.Round(s.stepX))
+		s.stepX -= float64(dx)
+	}
+	if math.Abs(s.stepY) >= 1 {
+		dy = int(math.Round(s.stepY))
+		s.stepY -= float64(dy)
+	}
+	return dx, dy
+}
+
+// NextMove implements Strategy interface
+func (s *RandomWalkStrategy) NextMove(currentX, currentY int) (newX, newY int) {
+	s.updateDirection()
+	dx, dy := s.accumulateSteps()
+	return currentX + dx, currentY + dy
+}
+
+// PatrolStrategy makes the mech patrol between points
+type PatrolStrategy struct {
+	points     [][2]int
+	currPoint  int
+	stepX      float64
+	stepY      float64
+	targetX    int
+	targetY    int
+}
+
+// NewPatrolStrategy creates a new patrol movement strategy
+func NewPatrolStrategy(points [][2]int) *PatrolStrategy {
+	if len(points) < 2 {
+		panic("PatrolStrategy requires at least 2 points")
+	}
+	return &PatrolStrategy{
+		points:    points,
+		currPoint: 0,
+		stepX:     0,
+		stepY:     0,
+		targetX:   points[0][0],
+		targetY:   points[0][1],
+	}
+}
+
+// updateTarget moves to the next patrol point if current target is reached
+func (s *PatrolStrategy) updateTarget(currentX, currentY int) {
+	if currentX == s.targetX && currentY == s.targetY {
+		s.currPoint = (s.currPoint + 1) % len(s.points)
+		s.targetX = s.points[s.currPoint][0]
+		s.targetY = s.points[s.currPoint][1]
+	}
+}
+
+// calculateSteps accumulates movement steps toward target
+func (s *PatrolStrategy) calculateSteps(currentX, currentY int) (moveX, moveY int) {
+	dx := float64(s.targetX - currentX)
+	dy := float64(s.targetY - currentY)
+	distance := math.Sqrt(dx*dx + dy*dy)
+	
+	if distance > 0 {
+		s.stepX += (dx / distance) * moveStep
+		s.stepY += (dy / distance) * moveStep
+	}
+
+	if math.Abs(s.stepX) >= 1 {
+		moveX = int(math.Round(s.stepX))
+		s.stepX -= float64(moveX)
+	}
+	if math.Abs(s.stepY) >= 1 {
+		moveY = int(math.Round(s.stepY))
+		s.stepY -= float64(moveY)
+	}
+	return moveX, moveY
+}
+
+// NextMove implements Strategy interface
+func (s *PatrolStrategy) NextMove(currentX, currentY int) (newX, newY int) {
+	s.updateTarget(currentX, currentY)
+	moveX, moveY := s.calculateSteps(currentX, currentY)
+	return currentX + moveX, currentY + moveY
+}
