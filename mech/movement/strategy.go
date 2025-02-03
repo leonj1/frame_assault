@@ -11,6 +11,7 @@ const (
 	// Movement constants
 	moveStep = 0.1 // Slower movement speed
 	directionChangeChance = 0.1
+	minStepThreshold = 1.0 // Minimum step size for movement
 )
 
 // Strategy defines the interface for mech movement behaviors
@@ -111,18 +112,38 @@ func (s *PatrolStrategy) updateTarget(currentX, currentY int) {
 func (s *PatrolStrategy) calculateSteps(currentX, currentY int) (moveX, moveY int) {
 	dx := float64(s.targetX - currentX)
 	dy := float64(s.targetY - currentY)
-	distance := math.Sqrt(dx*dx + dy*dy)
-	
-	if distance > 0 {
-		s.stepX += (dx / distance) * moveStep
-		s.stepY += (dy / distance) * moveStep
+
+	dx, dy = s.normalizeDirection(dx, dy)
+	s.accumulateSteps(dx, dy)
+	return s.getIntegerSteps()
+}
+
+// normalizeDirection normalizes the direction vector without using square root
+func (s *PatrolStrategy) normalizeDirection(dx, dy float64) (float64, float64) {
+	dxAbs, dyAbs := math.Abs(dx), math.Abs(dy)
+	if dxAbs == 0 && dyAbs == 0 {
+		return 0, 0
 	}
 
-	if math.Abs(s.stepX) >= 1 {
+	if dxAbs > dyAbs {
+		return dx/dxAbs, dy/dxAbs
+	}
+	return dx/dyAbs, dy/dyAbs
+}
+
+// accumulateSteps adds the normalized direction to the current steps
+func (s *PatrolStrategy) accumulateSteps(dx, dy float64) {
+	s.stepX += dx * moveStep
+	s.stepY += dy * moveStep
+}
+
+// getIntegerSteps converts accumulated steps to integer movements
+func (s *PatrolStrategy) getIntegerSteps() (moveX, moveY int) {
+	if math.Abs(s.stepX) >= minStepThreshold {
 		moveX = int(math.Round(s.stepX))
 		s.stepX -= float64(moveX)
 	}
-	if math.Abs(s.stepY) >= 1 {
+	if math.Abs(s.stepY) >= minStepThreshold {
 		moveY = int(math.Round(s.stepY))
 		s.stepY -= float64(moveY)
 	}
