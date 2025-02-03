@@ -119,23 +119,36 @@ func (m *Mech) Tick(event tl.Event) {
 	}
 }
 
-// Hit is call when a mech is hit
+// logAndNotify sends a message to both game log and notifier if they exist
+func (m *Mech) logAndNotify(message string) {
+	if m.game != nil {
+		m.game.Log(message)
+	}
+	if m.notifier != nil {
+		m.notifier.AddMessage(message)
+	}
+}
+
+// removeFromLevel removes the mech from the game level if possible
+func (m *Mech) removeFromLevel() {
+	if m.game == nil || m.game.Screen() == nil {
+		return
+	}
+	m.game.Screen().Level().RemoveEntity(m)
+}
+
+// Hit is called when a mech is hit
 func (m *Mech) Hit(damage int) {
-	//check if the mech is already destroyed
 	if m.structure <= 0 {
 		return
 	}
 
 	m.structure -= damage
-	message1 := m.name + " takes " + strconv.Itoa(damage)
-	m.game.Log(message1)
-	m.notifier.AddMessage(message1)
+	m.logAndNotify(m.name + " takes " + strconv.Itoa(damage))
 
 	if m.structure <= 0 {
-		message2 := m.name + " has been destroyed"
-		m.game.Log(message2)
-		m.notifier.AddMessage(message2)
-		m.game.Screen().Level().RemoveEntity(m)
+		m.logAndNotify(m.name + " has been destroyed")
+		m.removeFromLevel()
 	}
 }
 

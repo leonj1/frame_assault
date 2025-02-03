@@ -107,15 +107,15 @@ func validatePoint(x, y int) error {
 }
 
 // NewPatrolStrategy creates a new patrol movement strategy
-func NewPatrolStrategy(points [][2]int) *PatrolStrategy {
+func NewPatrolStrategy(points [][2]int) (*PatrolStrategy, error) {
 	if len(points) < 2 {
-		panic("PatrolStrategy requires at least 2 points")
+		return nil, fmt.Errorf("patrol strategy requires at least 2 points, got %d", len(points))
 	}
 
 	// Validate all points are within bounds
 	for i, point := range points {
 		if err := validatePoint(point[0], point[1]); err != nil {
-			panic(fmt.Sprintf("patrol point %d is invalid: %v", i, err))
+			return nil, fmt.Errorf("patrol point %d is invalid: %w", i, err)
 		}
 	}
 
@@ -126,7 +126,7 @@ func NewPatrolStrategy(points [][2]int) *PatrolStrategy {
 		stepY:     0,
 		targetX:   points[0][0],
 		targetY:   points[0][1],
-	}
+	}, nil
 }
 
 // updateTarget moves to the next patrol point if current target is reached

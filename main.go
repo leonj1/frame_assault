@@ -81,62 +81,70 @@ func (b *Building) Draw(s *tl.Screen) {
 }
 
 // GenerateEnemyMechs creates a slice of mechs to be used as enemies
-func GenerateEnemyMechs(number int) []*mech.EnemyMech {
-	enemyMechs := make([]*mech.EnemyMech, 0, number)
+func GenerateEnemyMechs(number int, game *tl.Game) []*mech.EnemyMech {
+	enemyMechs := make([]*mech.EnemyMech, number)
 	r := rand.New(rand.NewSource(time.Now().UnixNano()))
 
-	// Create patrol points for different areas of the map
-	patrolAreas := [][][2]int{
-		{{-15, -15}, {15, -15}, {15, 15}, {-15, 15}}, // Outer patrol
-		{{-8, -8}, {8, -8}, {8, 8}, {-8, 8}},         // Inner patrol
-		{{-5, 0}, {5, 0}},                             // Horizontal patrol
-		{{0, -5}, {0, 5}},                             // Vertical patrol
-	}
-
-	for i := 1; i <= number; i++ {
-		var m *mech.EnemyMech
+	for i := 0; i < number; i++ {
+		// Random starting position
 		x := -15 + r.Intn(30)
 		y := -15 + r.Intn(30)
 
-		// Choose movement strategy
-		var strategy movement.Strategy
-		if i%2 == 0 {
-			strategy = movement.NewRandomWalkStrategy()
-		} else {
-			patrolPoints := patrolAreas[i%len(patrolAreas)]
-			strategy = movement.NewPatrolStrategy(patrolPoints)
+		// Create patrol points for the enemy
+		patrolPoints := [][2]int{
+			{x + buildingMargin, y + 1},
+			{x + buildingMargin + buildingSize, y + 1},
 		}
 
-		// Create enemy mech with different types
+		var strategy movement.Strategy
+		patrolStrategy, err := movement.NewPatrolStrategy(patrolPoints)
+		if err != nil {
+			// If patrol strategy fails, fallback to random walk
+			strategy = movement.NewRandomWalkStrategy()
+			if game != nil {
+				game.Log("Failed to create patrol strategy: %v, falling back to random walk", err)
+			}
+		} else {
+			strategy = patrolStrategy
+		}
+
+		// Create enemy mech with the strategy
 		chance := i % 8
 		switch chance {
 		case 0:
-			m = mech.NewEnemyMech("Mech A", i, x, y, tl.ColorRed, rune('A'), strategy)
+			m := mech.NewEnemyMech("Mech A", i, x, y, tl.ColorRed, rune('A'), strategy)
 			m.AddWeapon(weapon.CreateRifle())
+			enemyMechs[i] = m
 		case 1:
-			m = mech.NewEnemyMech("Mech B", i, x, y, tl.ColorRed, rune('B'), strategy)
+			m := mech.NewEnemyMech("Mech B", i, x, y, tl.ColorRed, rune('B'), strategy)
 			m.AddWeapon(weapon.CreateRifle())
+			enemyMechs[i] = m
 		case 2:
-			m = mech.NewEnemyMech("Mech C", i, x, y, tl.ColorRed, rune('C'), strategy)
+			m := mech.NewEnemyMech("Mech C", i, x, y, tl.ColorRed, rune('C'), strategy)
 			m.AddWeapon(weapon.CreateShotgun())
+			enemyMechs[i] = m
 		case 3:
-			m = mech.NewEnemyMech("Mech D", i, x, y, tl.ColorRed, rune('D'), strategy)
+			m := mech.NewEnemyMech("Mech D", i, x, y, tl.ColorRed, rune('D'), strategy)
 			m.AddWeapon(weapon.CreateShotgun())
+			enemyMechs[i] = m
 		case 4:
-			m = mech.NewEnemyMech("Mech E", i, x, y, tl.ColorRed, rune('E'), strategy)
+			m := mech.NewEnemyMech("Mech E", i, x, y, tl.ColorRed, rune('E'), strategy)
 			m.AddWeapon(weapon.CreateSword())
+			enemyMechs[i] = m
 		case 5:
-			m = mech.NewEnemyMech("Mech F", i, x, y, tl.ColorRed, rune('F'), strategy)
+			m := mech.NewEnemyMech("Mech F", i, x, y, tl.ColorRed, rune('F'), strategy)
 			m.AddWeapon(weapon.CreateSword())
+			enemyMechs[i] = m
 		case 6:
-			m = mech.NewEnemyMech("Mech G", i, x, y, tl.ColorRed, rune('G'), strategy)
+			m := mech.NewEnemyMech("Mech G", i, x, y, tl.ColorRed, rune('G'), strategy)
 			m.AddWeapon(weapon.CreateFist())
+			enemyMechs[i] = m
 		case 7:
-			m = mech.NewEnemyMech("Mech H", i, x, y, tl.ColorRed, rune('H'), strategy)
+			m := mech.NewEnemyMech("Mech H", i, x, y, tl.ColorRed, rune('H'), strategy)
 			m.AddWeapon(weapon.CreateFist())
+			enemyMechs[i] = m
 		}
-
-		enemyMechs = append(enemyMechs, m)
+		enemyMechs[i].AttachGame(game)
 	}
 
 	return enemyMechs
@@ -254,12 +262,11 @@ func main() {
 	notification := display.NewNotification(25, 0, 45, 6, level)
 
 	//Create the enemy mechs
-	enemies := GenerateEnemyMechs(8)
+	enemies := GenerateEnemyMechs(8, game)
 	enemyMechs := make([]*mech.Mech, len(enemies))
 	for i, enemy := range enemies {
-		enemy.AttachGame(game)
-		enemy.AttachNotifier(notification)
 		enemy.SetLevel(level)
+		enemy.AttachNotifier(notification)
 		level.AddEntity(enemy)
 		enemyMechs[i] = enemy.Mech
 	}
