@@ -184,6 +184,15 @@ const (
 	gameFPS       = 10 // Run at 10 FPS for smoother animation while keeping slow movement
 )
 
+// getSafeSpawnPosition returns a position that is not on a road or building
+func getSafeSpawnPosition() (x, y int) {
+	// Position player in the middle of a block between roads
+	// Add buildingMargin to avoid spawning too close to buildings
+	x = buildingMargin + avenueSpacing/2
+	y = buildingMargin + streetSpacing/2
+	return x, y
+}
+
 func createManhattanLayout(level *tl.BaseLevel) {
 	roadSystem := NewRoadSystem()
 
@@ -256,7 +265,8 @@ func main() {
 	}
 
 	//Create the player mech
-	player := mech.NewPlayerMech("Player", 10, 0, 0, level)
+	spawnX, spawnY := getSafeSpawnPosition()
+	player := mech.NewPlayerMech("Player", 10, spawnX, spawnY, level)
 	player.AttachGame(game)
 	player.AttachNotifier(notification)
 	player.SetEnemyList(enemyMechs)
