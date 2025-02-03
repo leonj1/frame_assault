@@ -260,8 +260,8 @@ func main() {
 	player.AttachGame(game)
 	player.AttachNotifier(notification)
 	player.SetEnemyList(enemyMechs)
-	player.AddWeapon(weapon.CreateRifle())
 	level.AddEntity(player)
+	player.AddWeapon(weapon.CreateRifle())
 
 	//Create the player status display
 	playerStatus := display.NewPlayerStatus(0, 0, 25, 6, player, level)
