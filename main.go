@@ -2,6 +2,7 @@
 package main
 
 import (
+	"fmt"
 	"math/rand"
 	"time"
 
@@ -99,38 +100,116 @@ var enemyMechConfigs = []mechConfig{
 	{"Mech H", 'H', weapon.CreateFist},
 }
 
+// getValidPatrolPoints generates patrol points that don't overlap with buildings
+func getValidPatrolPoints(x, y int, level *tl.BaseLevel) ([][2]int, error) {
+	// Try different patrol patterns until we find a valid one
+	patterns := []struct {
+		dx1, dy1, dx2, dy2 int
+	}{
+		// Horizontal patrol (left to right)
+		{buildingMargin, 1, buildingMargin + buildingSize, 1},
+		// Vertical patrol (top to bottom)
+		{buildingMargin, 0, buildingMargin, buildingSize},
+		// Diagonal patrol
+		{buildingMargin, 1, buildingMargin + buildingSize/2, buildingSize/2},
+	}
+
+	// Check each pattern for validity
+	for _, p := range patterns {
+		point1 := [2]int{x + p.dx1, y + p.dy1}
+		point2 := [2]int{x + p.dx2, y + p.dy2}
+
+		// Validate points are within bounds
+		if !isPointInBounds(point1[0], point1[1]) || !isPointInBounds(point2[0], point2[1]) {
+			continue
+		}
+
+		// Check for collisions with buildings
+		if !hasCollision(point1[0], point1[1], level) && !hasCollision(point2[0], point2[1], level) {
+			return [][2]int{point1, point2}, nil
+		}
+	}
+
+	return nil, fmt.Errorf("no valid patrol points found at position (%d,%d)", x, y)
+}
+
+// isPointInBounds checks if a point is within game boundaries
+func isPointInBounds(x, y int) bool {
+	return x >= minCoordinate && x <= maxLevelWidth &&
+		y >= minCoordinate && y <= maxLevelHeight
+}
+
+// hasCollision checks if a point collides with any physical entity
+func hasCollision(x, y int, level *tl.BaseLevel) bool {
+	for _, entity := range level.Entities {
+		if entity == nil {
+			continue
+		}
+
+		physical, ok := entity.(tl.Physical)
+		if !ok {
+			continue
+		}
+
+		// Get entity position and size
+		eX, eY := physical.Position()
+		if eX == x && eY == y {
+			return true
+		}
+	}
+	return false
+}
+
 // GenerateEnemyMechs creates a slice of mechs to be used as enemies
-func GenerateEnemyMechs(number int, game *tl.Game) []*mech.EnemyMech {
+func GenerateEnemyMechs(number int, game *tl.Game, level *tl.BaseLevel) []*mech.EnemyMech {
 	enemyMechs := make([]*mech.EnemyMech, number)
 	r := rand.New(rand.NewSource(time.Now().UnixNano()))
 
 	for i := 0; i < number; i++ {
-		// Random starting position
-		x := -15 + r.Intn(30)
-		y := -15 + r.Intn(30)
+		// Keep trying different positions until we find a valid one
+		var strategy movement.Strategy
+		var finalX, finalY int
 
-		// Create patrol points for the enemy
-		patrolPoints := [][2]int{
-			{x + buildingMargin, y + 1},
-			{x + buildingMargin + buildingSize, y + 1},
+		for attempts := 0; attempts < 10; attempts++ {
+			// Random starting position
+			x := -15 + r.Intn(30)
+			y := -15 + r.Intn(30)
+
+			// Try to get valid patrol points
+			patrolPoints, err := getValidPatrolPoints(x, y, level)
+			if err != nil {
+				if attempts == 9 { // Last attempt, fallback to random walk
+					strategy = movement.NewRandomWalkStrategy()
+					finalX, finalY = x, y // Use last attempted position
+					if game != nil {
+						game.Log("Failed to find valid patrol points after %d attempts, using random walk", attempts+1)
+					}
+				}
+				continue
+			}
+
+			// Create patrol strategy with valid points
+			patrolStrategy, err := movement.NewPatrolStrategy(patrolPoints)
+			if err != nil {
+				if game != nil {
+					game.Log("Failed to create patrol strategy: %v, falling back to random walk", err)
+				}
+				strategy = movement.NewRandomWalkStrategy()
+			} else {
+				strategy = patrolStrategy
+			}
+			finalX, finalY = x, y // Use position where valid patrol points were found
+			break
 		}
 
-		// Create movement strategy
-		var strategy movement.Strategy
-		patrolStrategy, err := movement.NewPatrolStrategy(patrolPoints)
-		if err != nil {
-			// If patrol strategy fails, fallback to random walk
+		// If no strategy was created (shouldn't happen due to random walk fallback)
+		if strategy == nil {
 			strategy = movement.NewRandomWalkStrategy()
-			if game != nil {
-				game.Log("Failed to create patrol strategy: %v, falling back to random walk", err)
-			}
-		} else {
-			strategy = patrolStrategy
 		}
 
 		// Create enemy mech using configuration
 		config := enemyMechConfigs[i%len(enemyMechConfigs)]
-		m := mech.NewEnemyMech(config.name, i, x, y, tl.ColorRed, config.symbol, strategy)
+		m := mech.NewEnemyMech(config.name, i, finalX, finalY, tl.ColorRed, config.symbol, strategy)
 		m.AddWeapon(config.weapon())
 		m.AttachGame(game)
 		enemyMechs[i] = m
@@ -179,6 +258,9 @@ const (
 	buildingMargin = 2
 	buildingSize   = 4
 	gameFPS       = 10 // Run at 10 FPS for smoother animation while keeping slow movement
+	minCoordinate = 0
+	maxLevelWidth = levelWidth - 1
+	maxLevelHeight = levelHeight - 1
 )
 
 // getSafeSpawnPosition returns a position that is not on a road or building
@@ -251,7 +333,7 @@ func main() {
 	notification := display.NewNotification(25, 0, 45, 6, level)
 
 	//Create the enemy mechs
-	enemies := GenerateEnemyMechs(8, game)
+	enemies := GenerateEnemyMechs(8, game, level)
 	enemyMechs := make([]*mech.Mech, len(enemies))
 	for i, enemy := range enemies {
 		enemy.SetLevel(level)
