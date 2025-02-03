@@ -5,6 +5,7 @@ import (
 	"strconv"
 
 	"github.com/Ariemeth/frame_assault/mech/weapon"
+	"github.com/Ariemeth/frame_assault/util/debug"
 	"github.com/Ariemeth/frame_assault/util"
 	tl "github.com/Ariemeth/termloop"
 )
@@ -185,7 +186,7 @@ func (m *Mech) isValidMove(newX, newY int) bool {
 	// Check game boundaries
 	if newX < minCoordinate || newX > maxLevelWidth ||
 		newY < minCoordinate || newY > maxLevelHeight {
-		if m.game != nil {
+		if debug.MovementValidation && m.game != nil {
 			m.game.Log("%s attempted to move out of bounds to (%d,%d)", m.name, newX, newY)
 		}
 		return false
@@ -211,7 +212,7 @@ func (m *Mech) isValidMove(newX, newY int) bool {
 			
 			// If entity is at target position, collision detected
 			if eX == newX && eY == newY {
-				if m.game != nil {
+				if debug.MovementValidation && m.game != nil {
 					m.game.Log("%s attempted to move into occupied position (%d,%d)", m.name, newX, newY)
 				}
 				return false

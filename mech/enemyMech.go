@@ -2,6 +2,7 @@ package mech
 
 import (
 	"github.com/Ariemeth/frame_assault/mech/movement"
+	"github.com/Ariemeth/frame_assault/util/debug"
 	tl "github.com/Ariemeth/termloop"
 )
 
@@ -36,11 +37,14 @@ func (e *EnemyMech) Tick(event tl.Event) {
 
 	// Only move if the mech is not destroyed
 	if !e.IsDestroyed() {
-		if e.game != nil {
+		e.tickCount++
+
+		// Only log ticks in debug mode
+		if debug.EnemyTicks && e.game != nil {
 			e.game.Log("Enemy %s tick: count=%d", e.Name(), e.tickCount)
 		}
-		
-		e.tickCount++
+
+		// Process movement every moveTickRate ticks
 		if e.tickCount >= e.moveDelay {
 			e.tickCount = 0
 			
