@@ -4,6 +4,7 @@ package movement
 import (
 	"math"
 	"math/rand"
+	"sync"
 	"time"
 )
 
@@ -22,6 +23,7 @@ type Strategy interface {
 
 // RandomWalkStrategy makes the mech move randomly in any direction
 type RandomWalkStrategy struct {
+	mu        sync.Mutex
 	rng       *rand.Rand
 	direction float64
 	stepX     float64
@@ -40,6 +42,9 @@ func NewRandomWalkStrategy() *RandomWalkStrategy {
 
 // updateDirection changes direction with a random chance
 func (s *RandomWalkStrategy) updateDirection() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
 	if s.stepX == 0 && s.stepY == 0 || s.rng.Float64() < directionChangeChance {
 		s.direction = s.rng.Float64() * 2 * math.Pi
 		s.stepX = math.Cos(s.direction) * moveStep
@@ -47,20 +52,20 @@ func (s *RandomWalkStrategy) updateDirection() {
 	}
 }
 
-// accumulateSteps updates step values based on current direction
+// accumulateSteps updates step values based on current direction and returns integer movements
 func (s *RandomWalkStrategy) accumulateSteps() (dx, dy int) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
 	s.stepX += math.Cos(s.direction) * moveStep
 	s.stepY += math.Sin(s.direction) * moveStep
-	return s.getIntegerSteps()
-}
 
-// getIntegerSteps converts accumulated steps to integer movements
-func (s *RandomWalkStrategy) getIntegerSteps() (dx, dy int) {
-	if math.Abs(s.stepX) >= 1 {
+	// Convert to integer movements
+	if math.Abs(s.stepX) >= minStepThreshold {
 		dx = int(math.Round(s.stepX))
 		s.stepX -= float64(dx)
 	}
-	if math.Abs(s.stepY) >= 1 {
+	if math.Abs(s.stepY) >= minStepThreshold {
 		dy = int(math.Round(s.stepY))
 		s.stepY -= float64(dy)
 	}
