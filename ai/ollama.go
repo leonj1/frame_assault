@@ -22,10 +22,11 @@ type OllamaClient struct {
 
 // OllamaRequest represents the request body for Ollama API
 type OllamaRequest struct {
-    Model     string `json:"model"`
-    Prompt    string `json:"prompt"`
-    Stream    bool   `json:"stream"`
-    MaxTokens int    `json:"max_tokens,omitempty"`
+    Model     string         `json:"model"`
+    Prompt    string         `json:"prompt"`
+    Stream    bool           `json:"stream"`
+    MaxTokens int           `json:"max_tokens,omitempty"`
+    Context   *GameContext  `json:"context,omitempty"`
 }
 
 // OllamaResponse represents the response from Ollama API
@@ -52,11 +53,17 @@ func (c *OllamaClient) SetTimeout(timeout time.Duration) {
 
 // GenerateResponse sends a prompt to Ollama and returns the response
 func (c *OllamaClient) GenerateResponse(prompt string) (string, error) {
+    return c.GenerateResponseWithContext(prompt, nil)
+}
+
+// GenerateResponseWithContext sends a prompt with game context to Ollama
+func (c *OllamaClient) GenerateResponseWithContext(prompt string, context *GameContext) (string, error) {
     // Prepare request body
     reqBody := OllamaRequest{
-        Model:  c.model,
-        Prompt: prompt,
-        Stream: false,
+        Model:   c.model,
+        Prompt:  prompt,
+        Stream:  false,
+        Context: context,
     }
     
     jsonBody, err := json.Marshal(reqBody)
@@ -109,4 +116,30 @@ func (c *OllamaClient) GenerateResponse(prompt string) (string, error) {
     }
     
     return ollamaResp.Response, nil
+}
+
+// GetStrategicAdvice generates strategic advice based on the current game context
+func (c *OllamaClient) GetStrategicAdvice(context *GameContext) (string, error) {
+    prompt := context.FormatPrompt()
+    return c.GenerateResponseWithContext(prompt, context)
+}
+
+// GetNPCResponse generates and parses an NPC's next actions and state
+func (c *OllamaClient) GetNPCResponse(context *GameContext, npc *ComputerUser) (*NPCResponse, error) {
+    prompt := FormatNPCPrompt(context, npc)
+    response, err := c.GenerateResponseWithContext(prompt, context)
+    if err != nil {
+        return nil, fmt.Errorf("failed to generate response: %v", err)
+    }
+    
+    npcResponse, err := ParseOllamaResponse(response)
+    if err != nil {
+        return nil, fmt.Errorf("failed to parse response: %v", err)
+    }
+    
+    if err := npcResponse.ValidateResponse(); err != nil {
+        return nil, fmt.Errorf("invalid response: %v", err)
+    }
+    
+    return npcResponse, nil
 }
