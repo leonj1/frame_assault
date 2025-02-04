@@ -295,6 +295,7 @@ const (
     // Time constants
     realSecondsPerGameDay = 180.0  // 3 minutes real time = 24 hours game time
     gameHoursPerRealSecond = 24.0 / realSecondsPerGameDay
+    gameHoursPerFrame = gameHoursPerRealSecond / gameFPS
     timeDisplayX = 1
     timeDisplayY = 1
 )
@@ -307,8 +308,8 @@ type TimeSystemInterface interface {
 // TimeSystem handles the game's time progression
 type TimeSystem struct {
 	*tl.Entity
-	gameHours     float64
-	lastUpdate    time.Time
+	gameHours    float64
+	frameCounter int
 }
 
 // NewTimeSystem creates a new time system starting at 6:00 AM
@@ -316,7 +317,6 @@ func NewTimeSystem(level *tl.BaseLevel) *TimeSystem {
 	ts := &TimeSystem{
 		Entity:     tl.NewEntity(timeDisplayX, timeDisplayY, 20, 1),
 		gameHours:  6.0, // Start at 6 AM
-		lastUpdate: time.Now(),
 	}
 	return ts
 }
@@ -342,12 +342,8 @@ func (ts *TimeSystem) FormatGameTime() string {
 
 // Tick updates the game time
 func (ts *TimeSystem) Tick(event tl.Event) {
-	now := time.Now()
-	elapsed := now.Sub(ts.lastUpdate).Seconds()
-	ts.lastUpdate = now
-	
-	// Update game hours based on elapsed real time
-	ts.gameHours += elapsed * gameHoursPerRealSecond
+	ts.frameCounter++
+	ts.gameHours += gameHoursPerFrame
 	if ts.gameHours >= 24.0 {
 		ts.gameHours -= 24.0
 	}
