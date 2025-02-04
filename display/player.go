@@ -8,9 +8,12 @@ import (
 )
 
 const (
-    textLineStartX = 1  // X offset for text from display edge
-    textLineStartY = 1  // Y offset for first text line
-    textLineSpacing = 1 // Spacing between text lines
+    textLineStartX = 1    // X offset for text from display edge
+    textLineStartY = 1    // Y offset for first text line
+    textLineSpacing = 1   // Spacing between text lines
+    displayWidth = 25     // Width of the status display
+    displayHeight = 12    // Height of the status display (9 text lines + margins)
+    numTextLines = 9      // Total number of text lines in display
 )
 
 //Player represents a player status display
@@ -37,7 +40,7 @@ type TimeSystemInterface interface {
 //NewPlayer creates a new status display for the specified PlayerMech
 func NewPlayer(x, y int, player *mech.PlayerMech, timeSystem TimeSystemInterface, level *tl.BaseLevel) *Player {
     display := &Player{
-        Status:     *NewStatus(x, y, 25, 10, level),
+        Status:     *NewStatus(x, y, displayWidth, displayHeight, level),
         player:     player,
         timeSystem: timeSystem,
         textLine1:  tl.NewText(x, y, "", tl.ColorWhite, tl.ColorBlack),
