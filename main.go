@@ -1,16 +1,16 @@
-// main.go
 package main
 
 import (
-	"fmt"
-	"math/rand"
-	"time"
+    "fmt"
+    "log"
+    "math/rand"
+    "time"
 
-	"github.com/Ariemeth/frame_assault/display"
-	"github.com/Ariemeth/frame_assault/mech"
-	"github.com/Ariemeth/frame_assault/mech/movement"
-	"github.com/Ariemeth/frame_assault/mech/weapon"
-	tl "github.com/Ariemeth/termloop"
+    "github.com/Ariemeth/frame_assault/display"
+    "github.com/Ariemeth/frame_assault/mech"
+    "github.com/Ariemeth/frame_assault/mech/movement"
+    "github.com/Ariemeth/frame_assault/mech/weapon"
+    tl "github.com/Ariemeth/termloop"
 )
 
 // BuildingType represents different types of buildings
@@ -746,8 +746,13 @@ func (c *ComputerUserEntity) Collide(collision tl.Physical) {
 
 // placeComputerUsers places computer users near their homes
 func placeComputerUsers(users []*ComputerUser, level *tl.BaseLevel) {
+    const (
+        maxAttempts = 10
+        userSize = 1 // Size of user entity
+    )
+
     for i, user := range users {
-        // Calculate position near a home in the residential area
+        // Calculate initial position
         x := residentialStartX + (i * (buildingWidth + 2)) + 2
         y := residentialStartY + residentialHeight - 2
         
@@ -757,8 +762,29 @@ func placeComputerUsers(users []*ComputerUser, level *tl.BaseLevel) {
             y = residentialStartY + residentialHeight - 4
         }
         
-        userEntity := NewComputerUserEntity(user, x, y)
-        level.AddEntity(userEntity)
+        // Check for collisions and adjust position if needed
+        attempts := 0
+        for hasCollision(x, y, level) && attempts < maxAttempts {
+            x += 1
+            if x >= residentialStartX+residentialWidth {
+                x = residentialStartX
+                y -= 1
+                // Ensure y stays within residential area
+                if y < residentialStartY {
+                    y = residentialStartY + residentialHeight - 2
+                }
+            }
+            attempts++
+        }
+        
+        // Only place user if a valid position was found
+        if !hasCollision(x, y, level) {
+            userEntity := NewComputerUserEntity(user, x, y)
+            level.AddEntity(userEntity)
+        } else {
+            // Log warning if unable to place user
+            log.Printf("Warning: Unable to place computer user %d after %d attempts\n", i, maxAttempts)
+        }
     }
 }
 
