@@ -32,6 +32,7 @@ var buildingTypes = []BuildingType{
 	{"Restaurant", tl.ColorRed, 'R', 4},
 	{"Theater", tl.ColorYellow, 'T', 2},
 	{"Gym", tl.ColorGreen, 'Y', 3},
+	{"Home", tl.ColorWhite, 'H', 8}, // Adding residential homes
 }
 
 // Building represents a city building with a specific purpose
@@ -298,64 +299,85 @@ const (
     gameHoursPerFrame = gameHoursPerRealSecond / gameFPS
     timeDisplayX = 1
     timeDisplayY = 1
+    
+    // Residential district constants
+    residentialStartX = 40
+    residentialStartY = 10
+    residentialWidth = 40
+    residentialHeight = 30
 )
 
-// TimeSystemInterface defines the interface for time systems
-type TimeSystemInterface interface {
-	Tick(event tl.Event)
+// isInResidentialArea checks if a position is within the residential district
+func isInResidentialArea(x, y int) bool {
+    return x >= residentialStartX && x < residentialStartX+residentialWidth &&
+           y >= residentialStartY && y < residentialStartY+residentialHeight
 }
 
-// TimeSystem handles the game's time progression
-type TimeSystem struct {
-	*tl.Entity
-	gameHours    float64
-	frameCounter int
+// placeResidentialBuildings places homes in the residential district
+func placeResidentialBuildings(buildingCounts map[string]int, level *tl.BaseLevel) {
+    // Find the home building type
+    var homeType BuildingType
+    for _, bt := range buildingTypes {
+        if bt.name == "Home" {
+            homeType = bt
+            break
+        }
+    }
+    
+    // Place homes in a grid pattern within the residential area
+    for x := residentialStartX; x < residentialStartX+residentialWidth-buildingWidth; x += buildingWidth + 2 {
+        for y := residentialStartY; y < residentialStartY+residentialHeight-buildingHeight; y += buildingHeight + 2 {
+            if !hasCollision(x, y, level) {
+                building := NewBuilding(x, y, buildingWidth, buildingHeight, homeType)
+                level.AddEntity(building)
+                buildingCounts[homeType.name]++
+            }
+        }
+    }
 }
 
-// NewTimeSystem creates a new time system starting at 6:00 AM
-func NewTimeSystem(level *tl.BaseLevel) *TimeSystem {
-	ts := &TimeSystem{
-		Entity:     tl.NewEntity(timeDisplayX, timeDisplayY, 20, 1),
-		gameHours:  6.0, // Start at 6 AM
-	}
-	return ts
-}
-
-// FormatGameTime converts game hours to a 12-hour time string
-func (ts *TimeSystem) FormatGameTime() string {
-	hours := int(ts.gameHours) % 24
-	minutes := int((ts.gameHours - float64(int(ts.gameHours))) * 60)
-	period := "AM"
-	
-	if hours >= 12 {
-		period = "PM"
-		if hours > 12 {
-			hours -= 12
+// getValidBuildingPositions returns a list of valid positions for building placement
+func getValidBuildingPositions(roadSystem *RoadSystem) [][2]int {
+	valid := make([][2]int, 0)
+	for x := buildingMargin; x < levelWidth-buildingWidth; x += avenueSpacing {
+		for y := buildingMargin + 1; y < levelHeight-buildingHeight; y += streetSpacing {
+			// Check if the entire building area is free of roads
+			if !roadSystem.HasRoadInArea(x, y, buildingWidth, buildingHeight) {
+				valid = append(valid, [2]int{x, y})
+			}
 		}
 	}
-	if hours == 0 {
-		hours = 12
-	}
-	
-	return fmt.Sprintf("Time: %02d:%02d %s", hours, minutes, period)
+	return valid
 }
 
-// Tick updates the game time
-func (ts *TimeSystem) Tick(event tl.Event) {
-	ts.frameCounter++
-	ts.gameHours += gameHoursPerFrame
-	if ts.gameHours >= 24.0 {
-		ts.gameHours -= 24.0
+// tryPlaceBuilding attempts to place a building at the given location
+func tryPlaceBuilding(x, y int, buildingCounts map[string]int, level *tl.BaseLevel) bool {
+	for tries := 0; tries < len(buildingTypes)*2; tries++ {
+		buildingType := buildingTypes[rand.Intn(len(buildingTypes))]
+		if buildingCounts[buildingType.name] < buildingType.maxCount {
+			building := NewBuilding(x, y, buildingWidth, buildingHeight, buildingType)
+			level.AddEntity(building)
+			buildingCounts[buildingType.name]++
+			return true
+		}
 	}
+	return false
 }
 
-// getSafeSpawnPosition returns a position that is not on a road or building
-func getSafeSpawnPosition() (x, y int) {
-	// Position player in the middle of a block between roads
-	// Add buildingMargin to avoid spawning too close to buildings
-	x = buildingMargin + avenueSpacing/2
-	y = buildingMargin + streetSpacing/2
-	return x, y
+// placeBuildings places buildings in valid positions
+func placeBuildings(roadSystem *RoadSystem, buildingCounts map[string]int, level *tl.BaseLevel) {
+    // First place residential buildings
+    placeResidentialBuildings(buildingCounts, level)
+    
+    // Then place commercial and public buildings outside residential area
+    validPositions := getValidBuildingPositions(roadSystem)
+    for _, pos := range validPositions {
+        // Skip positions in residential area
+        if isInResidentialArea(pos[0], pos[1]) {
+            continue
+        }
+        tryPlaceBuilding(pos[0], pos[1], buildingCounts, level)
+    }
 }
 
 // createRoadSystem creates and returns a road system with vertical and horizontal roads
@@ -394,42 +416,6 @@ func initBuildingCounts() map[string]int {
 	return counts
 }
 
-// getValidBuildingPositions returns a list of valid positions for building placement
-func getValidBuildingPositions(roadSystem *RoadSystem) [][2]int {
-	valid := make([][2]int, 0)
-	for x := buildingMargin; x < levelWidth-buildingWidth; x += avenueSpacing {
-		for y := buildingMargin + 1; y < levelHeight-buildingHeight; y += streetSpacing {
-			// Check if the entire building area is free of roads
-			if !roadSystem.HasRoadInArea(x, y, buildingWidth, buildingHeight) {
-				valid = append(valid, [2]int{x, y})
-			}
-		}
-	}
-	return valid
-}
-
-// tryPlaceBuilding attempts to place a building at the given location
-func tryPlaceBuilding(x, y int, buildingCounts map[string]int, level *tl.BaseLevel) bool {
-	for tries := 0; tries < len(buildingTypes)*2; tries++ {
-		buildingType := buildingTypes[rand.Intn(len(buildingTypes))]
-		if buildingCounts[buildingType.name] < buildingType.maxCount {
-			building := NewBuilding(x, y, buildingWidth, buildingHeight, buildingType)
-			level.AddEntity(building)
-			buildingCounts[buildingType.name]++
-			return true
-		}
-	}
-	return false
-}
-
-// placeBuildings places buildings in valid positions
-func placeBuildings(roadSystem *RoadSystem, buildingCounts map[string]int, level *tl.BaseLevel) {
-	validPositions := getValidBuildingPositions(roadSystem)
-	for _, pos := range validPositions {
-		tryPlaceBuilding(pos[0], pos[1], buildingCounts, level)
-	}
-}
-
 // createManhattanLayout creates the city layout with roads and buildings
 func createManhattanLayout(level *tl.BaseLevel) {
 	roadSystem := createRoadSystem()
@@ -437,6 +423,56 @@ func createManhattanLayout(level *tl.BaseLevel) {
 	
 	buildingCounts := initBuildingCounts()
 	placeBuildings(roadSystem, buildingCounts, level)
+}
+
+// TimeSystemInterface defines the interface for time systems
+type TimeSystemInterface interface {
+    Tick(event tl.Event)
+    FormatGameTime() string
+}
+
+// TimeSystem handles the game's time progression
+type TimeSystem struct {
+    *tl.Entity
+    gameHours    float64
+    frameCounter int
+}
+
+// NewTimeSystem creates a new time system starting at 6:00 AM
+func NewTimeSystem(level *tl.BaseLevel) *TimeSystem {
+    ts := &TimeSystem{
+        Entity:     tl.NewEntity(timeDisplayX, timeDisplayY, 20, 1),
+        gameHours:  6.0, // Start at 6 AM
+    }
+    return ts
+}
+
+// FormatGameTime converts game hours to a 12-hour time string
+func (ts *TimeSystem) FormatGameTime() string {
+    hours := int(ts.gameHours) % 24
+    minutes := int((ts.gameHours - float64(int(ts.gameHours))) * 60)
+    period := "AM"
+    
+    if hours >= 12 {
+        period = "PM"
+        if hours > 12 {
+            hours -= 12
+        }
+    }
+    if hours == 0 {
+        hours = 12
+    }
+    
+    return fmt.Sprintf("Time: %02d:%02d %s", hours, minutes, period)
+}
+
+// Tick updates the game time
+func (ts *TimeSystem) Tick(event tl.Event) {
+    ts.frameCounter++
+    ts.gameHours += gameHoursPerFrame
+    if ts.gameHours >= 24.0 {
+        ts.gameHours -= 24.0
+    }
 }
 
 // Relationship represents a connection between the user and another person
@@ -708,6 +744,24 @@ func (c *ComputerUserEntity) Collide(collision tl.Physical) {
 	// Handle collisions if needed
 }
 
+// placeComputerUsers places computer users near their homes
+func placeComputerUsers(users []*ComputerUser, level *tl.BaseLevel) {
+    for i, user := range users {
+        // Calculate position near a home in the residential area
+        x := residentialStartX + (i * (buildingWidth + 2)) + 2
+        y := residentialStartY + residentialHeight - 2
+        
+        // Ensure position is within bounds
+        if x >= residentialStartX+residentialWidth {
+            x = residentialStartX + (i % 4) * (buildingWidth + 2) + 2
+            y = residentialStartY + residentialHeight - 4
+        }
+        
+        userEntity := NewComputerUserEntity(user, x, y)
+        level.AddEntity(userEntity)
+    }
+}
+
 func main() {
 	//Create the game
 	game := tl.NewGame()
@@ -732,18 +786,7 @@ func main() {
     
     // Generate and place computer users
     users := GenerateComputerUsers(8)
-    
-    // Place users around the map at predefined positions
-    userPositions := []struct{ x, y int }{
-        {5, 5}, {10, 5}, {15, 5}, {20, 5},  // Top row
-        {5, 10}, {10, 10}, {15, 10}, {20, 10}, // Bottom row
-    }
-    
-    for i, user := range users {
-        pos := userPositions[i]
-        userEntity := NewComputerUserEntity(user, pos.x, pos.y)
-        level.AddEntity(userEntity)
-    }
+    placeComputerUsers(users, level)
     
     //Create the enemy mechs
     enemies := GenerateEnemyMechs(8, game, level)
