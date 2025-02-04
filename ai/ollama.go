@@ -5,37 +5,49 @@ import (
     "encoding/json"
     "fmt"
     "io"
+    "net"
     "net/http"
+    "time"
 )
+
+// Default timeout for HTTP requests
+const defaultTimeout = 30 * time.Second
 
 // OllamaClient handles communication with the Ollama API
 type OllamaClient struct {
-    host  string
-    model string
+    host    string
+    model   string
+    timeout time.Duration
 }
 
 // OllamaRequest represents the request body for Ollama API
 type OllamaRequest struct {
-    Model    string `json:"model"`
-    Prompt   string `json:"prompt"`
-    Stream   bool   `json:"stream"`
-    MaxTokens int   `json:"max_tokens,omitempty"`
+    Model     string `json:"model"`
+    Prompt    string `json:"prompt"`
+    Stream    bool   `json:"stream"`
+    MaxTokens int    `json:"max_tokens,omitempty"`
 }
 
 // OllamaResponse represents the response from Ollama API
 type OllamaResponse struct {
-    Model     string `json:"model"`
-    Response  string `json:"response"`
-    Done      bool   `json:"done"`
-    Error     string `json:"error,omitempty"`
+    Model    string `json:"model"`
+    Response string `json:"response"`
+    Done     bool   `json:"done"`
+    Error    string `json:"error,omitempty"`
 }
 
 // NewOllamaClient creates a new Ollama client
 func NewOllamaClient(host, model string) *OllamaClient {
     return &OllamaClient{
-        host:  host,
-        model: model,
+        host:    host,
+        model:   model,
+        timeout: defaultTimeout,
     }
+}
+
+// SetTimeout sets a custom timeout for HTTP requests
+func (c *OllamaClient) SetTimeout(timeout time.Duration) {
+    c.timeout = timeout
 }
 
 // GenerateResponse sends a prompt to Ollama and returns the response
@@ -60,10 +72,15 @@ func (c *OllamaClient) GenerateResponse(prompt string) (string, error) {
     }
     req.Header.Set("Content-Type", "application/json")
     
-    // Send request
-    client := &http.Client{}
+    // Send request with timeout
+    client := &http.Client{
+        Timeout: c.timeout,
+    }
     resp, err := client.Do(req)
     if err != nil {
+        if err, ok := err.(net.Error); ok && err.Timeout() {
+            return "", fmt.Errorf("request timed out after %v: %v", c.timeout, err)
+        }
         return "", fmt.Errorf("error sending request: %v", err)
     }
     defer resp.Body.Close()
