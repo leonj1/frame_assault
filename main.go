@@ -291,7 +291,67 @@ const (
 	minCoordinate = 0
 	maxLevelWidth = levelWidth - 1
 	maxLevelHeight = levelHeight - 1
+    
+    // Time constants
+    realSecondsPerGameDay = 180.0  // 3 minutes real time = 24 hours game time
+    gameHoursPerRealSecond = 24.0 / realSecondsPerGameDay
+    timeDisplayX = 1
+    timeDisplayY = 1
 )
+
+// TimeSystemInterface defines the interface for time systems
+type TimeSystemInterface interface {
+	Tick(event tl.Event)
+}
+
+// TimeSystem handles the game's time progression
+type TimeSystem struct {
+	*tl.Entity
+	gameHours     float64
+	lastUpdate    time.Time
+}
+
+// NewTimeSystem creates a new time system starting at 6:00 AM
+func NewTimeSystem(level *tl.BaseLevel) *TimeSystem {
+	ts := &TimeSystem{
+		Entity:     tl.NewEntity(timeDisplayX, timeDisplayY, 20, 1),
+		gameHours:  6.0, // Start at 6 AM
+		lastUpdate: time.Now(),
+	}
+	return ts
+}
+
+// FormatGameTime converts game hours to a 12-hour time string
+func (ts *TimeSystem) FormatGameTime() string {
+	hours := int(ts.gameHours) % 24
+	minutes := int((ts.gameHours - float64(int(ts.gameHours))) * 60)
+	period := "AM"
+	
+	if hours >= 12 {
+		period = "PM"
+		if hours > 12 {
+			hours -= 12
+		}
+	}
+	if hours == 0 {
+		hours = 12
+	}
+	
+	return fmt.Sprintf("Time: %02d:%02d %s", hours, minutes, period)
+}
+
+// Tick updates the game time
+func (ts *TimeSystem) Tick(event tl.Event) {
+	now := time.Now()
+	elapsed := now.Sub(ts.lastUpdate).Seconds()
+	ts.lastUpdate = now
+	
+	// Update game hours based on elapsed real time
+	ts.gameHours += elapsed * gameHoursPerRealSecond
+	if ts.gameHours >= 24.0 {
+		ts.gameHours -= 24.0
+	}
+}
 
 // getSafeSpawnPosition returns a position that is not on a road or building
 func getSafeSpawnPosition() (x, y int) {
@@ -669,48 +729,52 @@ func main() {
 
 	//Create the notification display
 	notification := display.NewNotification(25, 0, 45, 6, level)
-
-	// Generate and place computer users
-	users := GenerateComputerUsers(8)
-	
-	// Place users around the map at predefined positions
-	userPositions := []struct{ x, y int }{
-		{5, 5}, {10, 5}, {15, 5}, {20, 5},  // Top row
-		{5, 10}, {10, 10}, {15, 10}, {20, 10}, // Bottom row
-	}
-	
-	for i, user := range users {
-		pos := userPositions[i]
-		userEntity := NewComputerUserEntity(user, pos.x, pos.y)
-		level.AddEntity(userEntity)
-	}
-	
-	//Create the enemy mechs
-	enemies := GenerateEnemyMechs(8, game, level)
-	enemyMechs := make([]*mech.Mech, len(enemies))
     
-	for i, enemy := range enemies {
-		enemy.SetLevel(level)
-		enemy.AttachNotifier(notification)
-		level.AddEntity(enemy)
-		enemyMechs[i] = enemy.Mech
-	}
+    // Create and add time system
+    timeSystem := NewTimeSystem(level)
+    level.AddEntity(timeSystem)
+    
+    // Generate and place computer users
+    users := GenerateComputerUsers(8)
+    
+    // Place users around the map at predefined positions
+    userPositions := []struct{ x, y int }{
+        {5, 5}, {10, 5}, {15, 5}, {20, 5},  // Top row
+        {5, 10}, {10, 10}, {15, 10}, {20, 10}, // Bottom row
+    }
+    
+    for i, user := range users {
+        pos := userPositions[i]
+        userEntity := NewComputerUserEntity(user, pos.x, pos.y)
+        level.AddEntity(userEntity)
+    }
+    
+    //Create the enemy mechs
+    enemies := GenerateEnemyMechs(8, game, level)
+    enemyMechs := make([]*mech.Mech, len(enemies))
+    
+    for i, enemy := range enemies {
+        enemy.SetLevel(level)
+        enemy.AttachNotifier(notification)
+        level.AddEntity(enemy)
+        enemyMechs[i] = enemy.Mech
+    }
 
-	//Create the player mech
-	spawnX := 1
-	spawnY := 1
-	player := mech.NewPlayerMech("Player", 10, spawnX, spawnY, level)
-	player.AttachGame(game)
-	player.AttachNotifier(notification)
-	player.SetEnemyList(enemyMechs)
-	level.AddEntity(player)
-	player.AddWeapon(weapon.CreateRifle())
+    // Create the player mech
+    spawnX := 1
+    spawnY := 1
+    player := mech.NewPlayerMech("Player", 10, spawnX, spawnY, level)
+    player.AttachGame(game)
+    player.AttachNotifier(notification)
+    player.SetEnemyList(enemyMechs)
+    level.AddEntity(player)
+    player.AddWeapon(weapon.CreateRifle())
+    
+    // Create player status display with time system
+    playerStatus := display.NewPlayer(0, 0, player, timeSystem, level)
+    level.AddEntity(playerStatus)
 
 	//Create the player status display
-	playerStatus := display.NewPlayerStatus(0, 0, 25, 6, player, level)
-	level.AddEntity(playerStatus)
-
-	//Create the notification display
 	level.AddEntity(notification)
 
 	//Set the level
