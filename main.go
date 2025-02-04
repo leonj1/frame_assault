@@ -576,6 +576,154 @@ const (
     HighIncome
 )
 
+const (
+    lowIncomeMin     = 500
+    lowIncomeMax     = 1500
+    middleIncomeMin  = 3000
+    middleIncomeMax  = 4000
+    highIncomeMin    = 10000
+    highIncomeMax    = 40000
+    
+    lowIncomeCarProb    = 0.3
+    middleIncomeCarProb = 1.0  // Always has a car
+    
+    middleIncomePropProb = 0.4
+    
+    minAge = 20
+    maxAge = 65
+    
+    standardWakeTime = "07:00"
+    standardSleepTime = "23:00"
+)
+
+var (
+    nationalities = []string{"American", "Canadian", "British", "German", "Japanese", "Australian"}
+    occupations = map[IncomeLevel][]string{
+        LowIncome:    {"Retail Worker", "Server", "Delivery Driver", "Security Guard"},
+        MiddleIncome: {"Teacher", "Nurse", "Office Manager", "Sales Representative"},
+        HighIncome:   {"Software Engineer", "Doctor", "Lawyer", "Business Executive"},
+    }
+    firstNames = []string{"John", "Jane", "Mike", "Sarah", "David", "Emma"}
+    lastNames  = []string{"Smith", "Johnson", "Williams", "Brown", "Jones", "Garcia"}
+    standardActivities = []string{"Work", "Exercise", "Leisure"}
+)
+
+// generateRandomName creates a random full name
+func generateRandomName() string {
+    first := firstNames[rand.Intn(len(firstNames))]
+    last := lastNames[rand.Intn(len(lastNames))]
+    return first + " " + last
+}
+
+// generateRandomAge returns a random age within defined bounds
+func generateRandomAge() int {
+    return minAge + rand.Intn(maxAge-minAge)
+}
+
+// generateCar creates a car based on income level
+func generateCar(level IncomeLevel) Car {
+    switch level {
+    case LowIncome:
+        return Car{
+            Make:  "Toyota",
+            Model: "Corolla",
+            Year:  2010 + rand.Intn(5),
+            Value: 5000 + float64(rand.Intn(3000)),
+        }
+    case MiddleIncome:
+        return Car{
+            Make:  "Honda",
+            Model: "Accord",
+            Year:  2015 + rand.Intn(5),
+            Value: 15000 + float64(rand.Intn(10000)),
+        }
+    default: // HighIncome
+        if rand.Float64() < 0.5 {
+            return Car{
+                Make:  "BMW",
+                Model: "5 Series",
+                Year:  2020 + rand.Intn(4),
+                Value: 50000 + float64(rand.Intn(30000)),
+            }
+        }
+        return Car{
+            Make:  "Tesla",
+            Model: "Model S",
+            Year:  2021 + rand.Intn(3),
+            Value: 80000 + float64(rand.Intn(40000)),
+        }
+    }
+}
+
+// generateProperty creates a property based on income level
+func generateProperty(level IncomeLevel) Property {
+    switch level {
+    case MiddleIncome:
+        return Property{
+            Address:    "123 Suburban St",
+            Type:      "House",
+            Value:     250000 + float64(rand.Intn(150000)),
+            YearBought: 2015 + rand.Intn(8),
+        }
+    default: // HighIncome
+        if rand.Float64() < 0.5 {
+            return Property{
+                Address:    "456 Luxury Ave",
+                Type:      "House",
+                Value:     800000 + float64(rand.Intn(500000)),
+                YearBought: 2018 + rand.Intn(5),
+            }
+        }
+        return Property{
+            Address:    "789 Investment St",
+            Type:      "Rental Property",
+            Value:     400000 + float64(rand.Intn(200000)),
+            YearBought: 2016 + rand.Intn(7),
+        }
+    }
+}
+
+// generateUserByIncomeLevel creates a computer user with attributes based on income level
+func generateUserByIncomeLevel(level IncomeLevel) *ComputerUser {
+    name := generateRandomName()
+    age := generateRandomAge()
+    nationality := nationalities[rand.Intn(len(nationalities))]
+    
+    user := NewComputerUser(name, age, nationality)
+    
+    possibleOccupations := occupations[level]
+    user.Occupation = possibleOccupations[rand.Intn(len(possibleOccupations))]
+    
+    user.DailyRoutine = DailyRoutine{
+        WakeUpTime: standardWakeTime,
+        SleepTime:  standardSleepTime,
+        Activities: standardActivities,
+    }
+    
+    // Set income level specific attributes
+    switch level {
+    case LowIncome:
+        user.PocketMoney = float64(lowIncomeMin + rand.Intn(lowIncomeMax))
+        if rand.Float64() < lowIncomeCarProb {
+            user.Cars = append(user.Cars, generateCar(level))
+        }
+    
+    case MiddleIncome:
+        user.PocketMoney = float64(middleIncomeMin + rand.Intn(middleIncomeMax))
+        user.Cars = append(user.Cars, generateCar(level))
+        if rand.Float64() < middleIncomePropProb {
+            user.Properties = append(user.Properties, generateProperty(level))
+        }
+    
+    case HighIncome:
+        user.PocketMoney = float64(highIncomeMin + rand.Intn(highIncomeMax))
+        user.Cars = []Car{generateCar(level), generateCar(level)}
+        user.Properties = []Property{generateProperty(level), generateProperty(level)}
+    }
+    
+    return user
+}
+
 // GenerateComputerUsers creates a slice of computer users with varying income levels
 func GenerateComputerUsers(number int) []*ComputerUser {
     users := make([]*ComputerUser, number)
@@ -606,107 +754,6 @@ func GenerateComputerUsers(number int) []*ComputerUser {
     }
     
     return users
-}
-
-// generateUserByIncomeLevel creates a single computer user based on their income level
-func generateUserByIncomeLevel(level IncomeLevel) *ComputerUser {
-    nationalities := []string{"American", "Canadian", "British", "German", "Japanese", "Australian"}
-    occupations := map[IncomeLevel][]string{
-        LowIncome: {"Retail Worker", "Server", "Delivery Driver", "Security Guard"},
-        MiddleIncome: {"Teacher", "Nurse", "Office Manager", "Sales Representative"},
-        HighIncome: {"Software Engineer", "Doctor", "Lawyer", "Business Executive"},
-    }
-    
-    // Random name generation (simple version)
-    firstNames := []string{"John", "Jane", "Mike", "Sarah", "David", "Emma"}
-    lastNames := []string{"Smith", "Johnson", "Williams", "Brown", "Jones", "Garcia"}
-    
-    rand.Seed(time.Now().UnixNano())
-    name := firstNames[rand.Intn(len(firstNames))] + " " + lastNames[rand.Intn(len(lastNames))]
-    age := 20 + rand.Intn(45) // Ages between 20 and 65
-    nationality := nationalities[rand.Intn(len(nationalities))]
-    
-    user := NewComputerUser(name, age, nationality)
-    
-    // Set occupation based on income level
-    possibleOccupations := occupations[level]
-    user.Occupation = possibleOccupations[rand.Intn(len(possibleOccupations))]
-    
-    // Set income level specific attributes
-    switch level {
-    case LowIncome:
-        user.PocketMoney = 500 + float64(rand.Intn(1500))
-        if rand.Float64() < 0.3 { // 30% chance to have a car
-            user.Cars = append(user.Cars, Car{
-                Make:  "Toyota",
-                Model: "Corolla",
-                Year:  2010 + rand.Intn(5),
-                Value: 5000 + float64(rand.Intn(3000)),
-            })
-        }
-    
-    case MiddleIncome:
-        user.PocketMoney = 3000 + float64(rand.Intn(4000))
-        user.Cars = append(user.Cars, Car{
-            Make:  "Honda",
-            Model: "Accord",
-            Year:  2015 + rand.Intn(5),
-            Value: 15000 + float64(rand.Intn(10000)),
-        })
-        if rand.Float64() < 0.4 { // 40% chance to have a property
-            user.Properties = append(user.Properties, Property{
-                Address:    "123 Suburban St",
-                Type:      "House",
-                Value:     250000 + float64(rand.Intn(150000)),
-                YearBought: 2015 + rand.Intn(8),
-            })
-        }
-    
-    case HighIncome:
-        user.PocketMoney = 10000 + float64(rand.Intn(40000))
-        // Multiple cars
-        cars := []Car{
-            {
-                Make:  "BMW",
-                Model: "5 Series",
-                Year:  2020 + rand.Intn(4),
-                Value: 50000 + float64(rand.Intn(30000)),
-            },
-            {
-                Make:  "Tesla",
-                Model: "Model S",
-                Year:  2021 + rand.Intn(3),
-                Value: 80000 + float64(rand.Intn(40000)),
-            },
-        }
-        user.Cars = cars
-        
-        // Multiple properties
-        properties := []Property{
-            {
-                Address:    "456 Luxury Ave",
-                Type:      "House",
-                Value:     800000 + float64(rand.Intn(500000)),
-                YearBought: 2018 + rand.Intn(5),
-            },
-            {
-                Address:    "789 Investment St",
-                Type:      "Rental Property",
-                Value:     400000 + float64(rand.Intn(200000)),
-                YearBought: 2016 + rand.Intn(7),
-            },
-        }
-        user.Properties = properties
-    }
-    
-    // Set daily routine
-    user.DailyRoutine = DailyRoutine{
-        WakeUpTime: "07:00",
-        SleepTime:  "23:00",
-        Activities: []string{"Work", "Exercise", "Leisure"},
-    }
-    
-    return user
 }
 
 // ComputerUserEntity represents a visual entity for a computer user in the game
@@ -862,6 +909,9 @@ func NewGameState(ollama *ai.OllamaClient) *GameState {
 }
 
 func main() {
+    // Initialize random seed
+    rand.Seed(time.Now().UnixNano())
+
     // Parse command line arguments
     ollamaHost := flag.String("ollama-host", defaultOllamaHost, "Ollama API host address")
     ollamaModel := flag.String("ollama-model", defaultOllamaModel, "Ollama model name")
