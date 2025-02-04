@@ -54,6 +54,8 @@ func NewBuilding(x, y, width, height int, buildingType BuildingType) *Building {
 
 func (b *Building) Draw(s *tl.Screen) {
 	x, y := b.Position()
+	
+	// Draw building outline and fill
 	for i := 0; i < b.width; i++ {
 		for j := 0; j < b.height; j++ {
 			// Draw building outline
@@ -63,21 +65,29 @@ func (b *Building) Draw(s *tl.Screen) {
 					Fg: tl.ColorBlack,
 					Ch: '█',
 				})
-			} else if i == b.width/2 && j == b.height/2 {
-				// Draw building type identifier in center
-				s.RenderCell(x+i, y+j, &tl.Cell{
-					Bg: b.buildingType.color,
-					Fg: tl.ColorBlack,
-					Ch: b.buildingType.char,
-				})
 			} else {
 				// Fill building interior
 				s.RenderCell(x+i, y+j, &tl.Cell{
 					Bg: b.buildingType.color,
-					Fg: b.buildingType.color,
+					Fg: tl.ColorBlack,
 					Ch: ' ',
 				})
 			}
+		}
+	}
+	
+	// Draw building name in the center
+	name := b.buildingType.name
+	startX := x + (b.width-len(name))/2
+	startY := y + b.height/2
+	
+	for i, ch := range name {
+		if startX+i < x+b.width-1 { // Ensure we don't write outside building bounds
+			s.RenderCell(startX+i, startY, &tl.Cell{
+				Bg: b.buildingType.color,
+				Fg: tl.ColorBlack,
+				Ch: ch,
+			})
 		}
 	}
 }
@@ -108,11 +118,11 @@ func getValidPatrolPoints(x, y int, level *tl.BaseLevel) ([][2]int, error) {
 		dx1, dy1, dx2, dy2 int
 	}{
 		// Horizontal patrol (left to right)
-		{buildingMargin, 1, buildingMargin + buildingSize, 1},
+		{buildingMargin, 1, buildingMargin + buildingWidth, 1},
 		// Vertical patrol (top to bottom)
-		{buildingMargin, 0, buildingMargin, buildingSize},
+		{buildingMargin, 0, buildingMargin, buildingHeight},
 		// Diagonal patrol
-		{buildingMargin, 1, buildingMargin + buildingSize/2, buildingSize/2},
+		{buildingMargin, 1, buildingMargin + buildingWidth/2, buildingHeight/2},
 	}
 
 	// Check each pattern for validity
@@ -252,13 +262,14 @@ func (r *RoadSystem) Draw(s *tl.Screen) {
 }
 
 const (
-	levelWidth     = 60
-	levelHeight    = 40
-	avenueSpacing  = 12
-	streetSpacing  = 6
+	levelWidth     = 100
+	levelHeight    = 60
+	avenueSpacing  = 20
+	streetSpacing  = 12
 	buildingMargin = 2
-	buildingSize   = 4
-	gameFPS       = 10 // Run at 10 FPS for smoother animation while keeping slow movement
+	buildingWidth  = 8
+	buildingHeight = 6
+	gameFPS       = 10
 	minCoordinate = 0
 	maxLevelWidth = levelWidth - 1
 	maxLevelHeight = levelHeight - 1
@@ -273,67 +284,76 @@ func getSafeSpawnPosition() (x, y int) {
 	return x, y
 }
 
-func createManhattanLayout(level *tl.BaseLevel) {
+// createRoadSystem creates and returns a road system with vertical and horizontal roads
+func createRoadSystem() *RoadSystem {
 	roadSystem := NewRoadSystem()
+	createVerticalRoads(roadSystem)
+	createHorizontalRoads(roadSystem)
+	return roadSystem
+}
 
-	// Main avenues (vertical roads)
+// createVerticalRoads adds vertical roads (avenues) to the road system
+func createVerticalRoads(roadSystem *RoadSystem) {
 	for x := buildingMargin - 2; x < levelWidth; x += avenueSpacing {
 		for y := 0; y < levelHeight; y++ {
 			roadSystem.AddRoad(x, y)
 			roadSystem.AddRoad(x+1, y)
 		}
 	}
+}
 
-	// Cross streets (horizontal roads)
+// createHorizontalRoads adds horizontal roads (streets) to the road system
+func createHorizontalRoads(roadSystem *RoadSystem) {
 	for y := buildingMargin; y < levelHeight; y += streetSpacing {
 		for x := 0; x < levelWidth; x++ {
 			roadSystem.AddRoad(x, y)
 		}
 	}
+}
 
-	// Add the road system as a single entity
-	level.AddEntity(roadSystem)
-
-	// Track building counts
-	buildingCounts := make(map[string]int)
+// initBuildingCounts initializes a map to track building counts
+func initBuildingCounts() map[string]int {
+	counts := make(map[string]int)
 	for _, bt := range buildingTypes {
-		buildingCounts[bt.name] = 0
+		counts[bt.name] = 0
+	}
+	return counts
+}
+
+// tryPlaceBuilding attempts to place a building at the given location
+func tryPlaceBuilding(x, y int, buildingCounts map[string]int, level *tl.BaseLevel) bool {
+	if hasCollision(x, y, level) {
+		return false
 	}
 
-	// City blocks (buildings)
-	buildingIndex := 0
-	for x := 0; x < levelWidth-buildingSize; x += avenueSpacing {
-		for y := 0; y < levelHeight-buildingSize; y += streetSpacing {
-			if x+buildingSize <= levelWidth && y+buildingSize <= levelHeight {
-				// Find next available building type
-				var buildingType BuildingType
-				for attempts := 0; attempts < len(buildingTypes); attempts++ {
-					candidateType := buildingTypes[buildingIndex%len(buildingTypes)]
-					if buildingCounts[candidateType.name] < candidateType.maxCount {
-						buildingType = candidateType
-						buildingCounts[buildingType.name]++
-						break
-					}
-					buildingIndex++
-				}
-
-				// Skip if no building type available
-				if buildingType.name == "" {
-					continue
-				}
-
-				building := NewBuilding(
-					x+buildingMargin,
-					y+1,
-					buildingSize,
-					buildingSize,
-					buildingType,
-				)
-				level.AddEntity(building)
-				buildingIndex++
-			}
+	for tries := 0; tries < len(buildingTypes)*2; tries++ {
+		buildingType := buildingTypes[rand.Intn(len(buildingTypes))]
+		if buildingCounts[buildingType.name] < buildingType.maxCount {
+			building := NewBuilding(x, y, buildingWidth, buildingHeight, buildingType)
+			level.AddEntity(building)
+			buildingCounts[buildingType.name]++
+			return true
 		}
 	}
+	return false
+}
+
+// placeBuildings places buildings in a grid pattern between roads
+func placeBuildings(buildingCounts map[string]int, level *tl.BaseLevel) {
+	for x := buildingMargin; x < levelWidth-buildingWidth; x += avenueSpacing {
+		for y := buildingMargin + 1; y < levelHeight-buildingHeight; y += streetSpacing {
+			tryPlaceBuilding(x, y, buildingCounts, level)
+		}
+	}
+}
+
+// createManhattanLayout creates the city layout with roads and buildings
+func createManhattanLayout(level *tl.BaseLevel) {
+	roadSystem := createRoadSystem()
+	level.AddEntity(roadSystem)
+	
+	buildingCounts := initBuildingCounts()
+	placeBuildings(buildingCounts, level)
 }
 
 // Relationship represents a connection between the user and another person
