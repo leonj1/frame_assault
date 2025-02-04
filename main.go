@@ -324,15 +324,33 @@ func placeResidentialBuildings(buildingCounts map[string]int, level *tl.BaseLeve
         }
     }
     
+    // Check if we've reached the maximum number of homes
+    if buildingCounts[homeType.name] >= homeType.maxCount {
+        log.Printf("Warning: Maximum number of homes (%d) already reached\n", homeType.maxCount)
+        return
+    }
+    
     // Place homes in a grid pattern within the residential area
     for x := residentialStartX; x < residentialStartX+residentialWidth-buildingWidth; x += buildingWidth + 2 {
         for y := residentialStartY; y < residentialStartY+residentialHeight-buildingHeight; y += buildingHeight + 2 {
+            // Stop if we've reached the maximum number of homes
+            if buildingCounts[homeType.name] >= homeType.maxCount {
+                log.Printf("Info: Placed maximum number of homes (%d)\n", homeType.maxCount)
+                return
+            }
+            
             if !hasCollision(x, y, level) {
                 building := NewBuilding(x, y, buildingWidth, buildingHeight, homeType)
                 level.AddEntity(building)
                 buildingCounts[homeType.name]++
             }
         }
+    }
+    
+    // Log if we couldn't place all homes
+    if buildingCounts[homeType.name] < homeType.maxCount {
+        log.Printf("Warning: Only placed %d/%d homes due to space constraints\n", 
+            buildingCounts[homeType.name], homeType.maxCount)
     }
 }
 
