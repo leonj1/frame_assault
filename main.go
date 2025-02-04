@@ -836,66 +836,80 @@ func getSafeSpawnPosition() (x, y int) {
     return x, y
 }
 
+// GameState holds the global game state including AI components
+type GameState struct {
+    ollama *ai.OllamaClient
+    game   *tl.Game
+    level  *tl.BaseLevel
+}
+
+// NewGameState creates a new game state instance
+func NewGameState(ollama *ai.OllamaClient) *GameState {
+    game := tl.NewGame()
+    game.Screen().SetFps(gameFPS)
+    
+    level := tl.NewBaseLevel(tl.Cell{
+        Bg: tl.ColorBlack,
+        Fg: tl.ColorBlack,
+        Ch: ' ',
+    })
+    
+    return &GameState{
+        ollama: ollama,
+        game:   game,
+        level:  level,
+    }
+}
+
 func main() {
     // Parse command line arguments
     ollamaHost := flag.String("ollama-host", defaultOllamaHost, "Ollama API host address")
     ollamaModel := flag.String("ollama-model", defaultOllamaModel, "Ollama model name")
     flag.Parse()
 
-    // Initialize Ollama client
+    // Initialize Ollama client and game state
     ollama := initOllama(*ollamaHost, *ollamaModel)
-    _ = ollama // Will be used later for AI interactions
-
-    // Create the game
-    game := tl.NewGame()
-    game.Screen().SetFps(gameFPS)
-
-    // Create the level for the game
-    level := tl.NewBaseLevel(tl.Cell{
-        Bg: tl.ColorBlack,
-        Fg: tl.ColorBlack,
-        Ch: ' ',
-    })
+    gameState := NewGameState(ollama)
 
     // Create Manhattan-like layout
-    createManhattanLayout(level)
+    createManhattanLayout(gameState.level)
 
     // Create the notification display
-    notification := display.NewNotification(25, 0, 45, 6, level)
+    notification := display.NewNotification(25, 0, 45, 6, gameState.level)
     
     // Create and add time system
-    timeSystem := NewTimeSystem(level)
-    level.AddEntity(timeSystem)
+    timeSystem := NewTimeSystem(gameState.level)
+    gameState.level.AddEntity(timeSystem)
     
     // Generate and place computer users
     users := GenerateComputerUsers(8)
-    placeComputerUsers(users, level)
+    placeComputerUsers(users, gameState.level)
     
     // Create the enemy mechs
-    enemies := GenerateEnemyMechs(8, game, level)
+    enemies := GenerateEnemyMechs(8, gameState.game, gameState.level)
     enemyMechs := make([]*mech.Mech, len(enemies))
     for i, enemy := range enemies {
-        enemy.SetLevel(level)
+        enemy.SetLevel(gameState.level)
         enemy.AttachNotifier(notification)
-        level.AddEntity(enemy)
+        gameState.level.AddEntity(enemy)
         enemyMechs[i] = enemy.Mech
     }
     
     // Create the player mech
     x, y := getSafeSpawnPosition()
-    player := mech.NewPlayerMech("Player", 10, x, y, level)
-    player.AttachGame(game)
+    player := mech.NewPlayerMech("Player", 10, x, y, gameState.level)
+    player.AttachGame(gameState.game)
     player.SetEnemyList(enemyMechs)
     player.AttachNotifier(notification)
-    level.AddEntity(player)
+    gameState.level.AddEntity(player)
     player.AddWeapon(weapon.CreateRifle())
     
     // Create the player status display
-    playerStatus := display.NewPlayer(0, 0, player, timeSystem, level)
-    level.AddEntity(playerStatus)
-    level.AddEntity(notification)
+    playerStatus := display.NewPlayer(0, 0, player, timeSystem, gameState.level)
+    gameState.level.AddEntity(playerStatus)
+    gameState.level.AddEntity(notification)
 
     // Set the level and start the game
-    game.Screen().SetLevel(level)
-    game.Start()
+    gameState.game.Screen().SetLevel(gameState.level)
+    gameState.game.Start()
 }
