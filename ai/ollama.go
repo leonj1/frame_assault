@@ -68,6 +68,12 @@ func (c *OllamaClient) GenerateResponse(prompt string) (string, error) {
     }
     defer resp.Body.Close()
     
+    // Check HTTP status code
+    if resp.StatusCode != http.StatusOK {
+        body, _ := io.ReadAll(resp.Body)
+        return "", fmt.Errorf("unexpected status code %d: %s", resp.StatusCode, string(body))
+    }
+    
     // Read response
     body, err := io.ReadAll(resp.Body)
     if err != nil {
