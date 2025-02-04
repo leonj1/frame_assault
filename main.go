@@ -261,6 +261,24 @@ func (r *RoadSystem) Draw(s *tl.Screen) {
 	}
 }
 
+func (r *RoadSystem) HasRoad(x, y int) bool {
+	if yMap, exists := r.roads[x]; exists {
+		return yMap[y]
+	}
+	return false
+}
+
+func (r *RoadSystem) HasRoadInArea(x, y, width, height int) bool {
+	for i := x; i < x+width; i++ {
+		for j := y; j < y+height; j++ {
+			if r.HasRoad(i, j) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 const (
 	levelWidth     = 100
 	levelHeight    = 60
@@ -320,12 +338,22 @@ func initBuildingCounts() map[string]int {
 	return counts
 }
 
+// getValidBuildingPositions returns a list of valid positions for building placement
+func getValidBuildingPositions(roadSystem *RoadSystem) [][2]int {
+	valid := make([][2]int, 0)
+	for x := buildingMargin; x < levelWidth-buildingWidth; x += avenueSpacing {
+		for y := buildingMargin + 1; y < levelHeight-buildingHeight; y += streetSpacing {
+			// Check if the entire building area is free of roads
+			if !roadSystem.HasRoadInArea(x, y, buildingWidth, buildingHeight) {
+				valid = append(valid, [2]int{x, y})
+			}
+		}
+	}
+	return valid
+}
+
 // tryPlaceBuilding attempts to place a building at the given location
 func tryPlaceBuilding(x, y int, buildingCounts map[string]int, level *tl.BaseLevel) bool {
-	if hasCollision(x, y, level) {
-		return false
-	}
-
 	for tries := 0; tries < len(buildingTypes)*2; tries++ {
 		buildingType := buildingTypes[rand.Intn(len(buildingTypes))]
 		if buildingCounts[buildingType.name] < buildingType.maxCount {
@@ -338,12 +366,11 @@ func tryPlaceBuilding(x, y int, buildingCounts map[string]int, level *tl.BaseLev
 	return false
 }
 
-// placeBuildings places buildings in a grid pattern between roads
-func placeBuildings(buildingCounts map[string]int, level *tl.BaseLevel) {
-	for x := buildingMargin; x < levelWidth-buildingWidth; x += avenueSpacing {
-		for y := buildingMargin + 1; y < levelHeight-buildingHeight; y += streetSpacing {
-			tryPlaceBuilding(x, y, buildingCounts, level)
-		}
+// placeBuildings places buildings in valid positions
+func placeBuildings(roadSystem *RoadSystem, buildingCounts map[string]int, level *tl.BaseLevel) {
+	validPositions := getValidBuildingPositions(roadSystem)
+	for _, pos := range validPositions {
+		tryPlaceBuilding(pos[0], pos[1], buildingCounts, level)
 	}
 }
 
@@ -353,7 +380,7 @@ func createManhattanLayout(level *tl.BaseLevel) {
 	level.AddEntity(roadSystem)
 	
 	buildingCounts := initBuildingCounts()
-	placeBuildings(buildingCounts, level)
+	placeBuildings(roadSystem, buildingCounts, level)
 }
 
 // Relationship represents a connection between the user and another person
