@@ -336,6 +336,72 @@ func createManhattanLayout(level *tl.BaseLevel) {
 	}
 }
 
+// Relationship represents a connection between the user and another person
+type Relationship struct {
+	PersonName     string
+	RelationType   string
+	RelationLevel  int // 1-10 scale
+}
+
+// Property represents a real estate property owned by the user
+type Property struct {
+	Address     string
+	Type        string
+	Value       float64
+	YearBought  int
+}
+
+// Car represents a vehicle owned by the user
+type Car struct {
+	Make      string
+	Model     string
+	Year      int
+	Value     float64
+}
+
+// DailyRoutine represents the user's daily schedule
+type DailyRoutine struct {
+	WakeUpTime    string
+	SleepTime     string
+	Activities    []string
+}
+
+// ComputerUser represents a computer user with their personal and professional details
+type ComputerUser struct {
+	Name                 string
+	Age                 int
+	Nationality         string
+	Occupation          string
+	OccupationDesc      string
+	DailyRoutine        DailyRoutine
+	PersonalityTraits   []string
+	ProfInterests       []string
+	PersonalInterests   []string
+	Skills              []string
+	Relationships       []Relationship
+	HealthIssues        []string
+	PocketMoney         float64
+	Properties          []Property
+	Cars                []Car
+}
+
+// NewComputerUser creates a new instance of ComputerUser with the provided details
+func NewComputerUser(name string, age int, nationality string) *ComputerUser {
+	return &ComputerUser{
+		Name:               name,
+		Age:                age,
+		Nationality:        nationality,
+		PersonalityTraits:  make([]string, 0),
+		ProfInterests:      make([]string, 0),
+		PersonalInterests:  make([]string, 0),
+		Skills:             make([]string, 0),
+		Relationships:      make([]Relationship, 0),
+		HealthIssues:       make([]string, 0),
+		Properties:         make([]Property, 0),
+		Cars:              make([]Car, 0),
+	}
+}
+
 func main() {
 	//Create the game
 	game := tl.NewGame()
